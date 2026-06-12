@@ -1,0 +1,26 @@
+# @vllnt/convex-slugs
+
+> Unique slug and handle registry with rename redirects, as a Convex component
+
+`@vllnt/convex-slugs` is a publishable Convex component. It targets `convex@^1.36.1`.
+It stores two sandboxed tables - `slugs` (unique per `(scope, slug)`, mapping to an opaque `resourceRef`) and `redirects` (old to new on rename). Uniqueness rides the Convex mutation transaction. The host owns the resource, auth, and meaning; the component owns only the uniqueness + redirect state. Slugs are case-folded by default.
+
+## Docs
+
+- [README](README.md): Project overview, installation, usage examples, architecture
+- [API Reference](docs/API.md): Public class methods, return shapes, input validation
+- [Changelog](CHANGELOG.md): Version history and release notes
+- [Contributing](CONTRIBUTING.md): Development setup, validation commands, release workflow
+
+## Examples
+
+- [Example component wrapper](example/convex/example.ts): Host-app wrapper functions
+- [Example tests](example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
+
+## Optional
+
+- [AGENTS](AGENTS.md): Canonical agent instructions for this repository
+- [Security Policy](SECURITY.md): Vulnerability reporting policy
+- [Code of Conduct](CODE_OF_CONDUCT.md): Community participation guidelines
+- [License](LICENSE)
+- [Full source bundle](llms-full.txt): Aggregated README, changelog, API docs, and key source files
