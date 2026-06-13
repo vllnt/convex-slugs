@@ -320,3 +320,125 @@ describe("slugs — duplicate-row degrade (hardening)", () => {
     expect(await t.mutation(api.example.release, { slug: "twin" })).toBeNull();
   });
 });
+
+describe("slugs — release cleans up inbound redirects (fix)", () => {
+  test("stale redirect: reserve→rename→release removes the inbound redirect", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "foo", resourceRef: "r1" });
+    await t.mutation(api.example.rename, { fromSlug: "foo", toSlug: "bar" });
+    // "foo" now redirects to "bar"
+    expect(await t.query(api.example.redirectFor, { slug: "foo" })).toBe("bar");
+    // release "bar" — should also clear the foo→bar redirect
+    await t.mutation(api.example.release, { slug: "bar" });
+    // redirectFor("foo") must return null, not the dead "bar"
+    expect(await t.query(api.example.redirectFor, { slug: "foo" })).toBeNull();
+  });
+
+  test("multi-inbound repoint then release clears all inbound redirects", async () => {
+    const t = setup();
+    // seed: b is the live slug; a→b and x→b are inbound redirects
+    await t.mutation(api.example.reserve, { slug: "mb", resourceRef: "r1" });
+    await t.mutation(api.example.injectRedirect, { fromSlug: "ma", toSlug: "mb" });
+    await t.mutation(api.example.injectRedirect, { fromSlug: "mx", toSlug: "mb" });
+    // rename b→c repoints both inbound redirects to c
+    await t.mutation(api.example.rename, { fromSlug: "mb", toSlug: "mc" });
+    expect(await t.query(api.example.redirectFor, { slug: "ma" })).toBe("mc");
+    expect(await t.query(api.example.redirectFor, { slug: "mx" })).toBe("mc");
+    // release mc — clears all three redirects (ma→mc, mx→mc, mb→mc)
+    await t.mutation(api.example.release, { slug: "mc" });
+    expect(await t.query(api.example.redirectFor, { slug: "ma" })).toBeNull();
+    expect(await t.query(api.example.redirectFor, { slug: "mx" })).toBeNull();
+  });
+
+  test("release with no inbound redirects is a no-op (idempotent)", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "solo", resourceRef: "s1" });
+    // no redirects point at "solo"
+    await t.mutation(api.example.release, { slug: "solo" });
+    expect(await t.query(api.example.resolve, { slug: "solo" })).toBeNull();
+  });
+});
+
+describe("slugs — self-rename guard (fix)", () => {
+  test("rename slug to itself returns SLUG_TAKEN", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "same", resourceRef: "r1" });
+    const r = await t.mutation(api.example.rename, { fromSlug: "same", toSlug: "same" });
+    expect(r).toEqual({ ok: false, reason: "SLUG_TAKEN" });
+    // the slug must still be held after the rejected self-rename
+    expect(await t.query(api.example.resolve, { slug: "same" })).toBe("r1");
+    // no redirect row created
+    expect(await t.query(api.example.redirectFor, { slug: "same" })).toBeNull();
+  });
+
+  test("rename slug to a different target succeeds (guard only blocks self)", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "from2", resourceRef: "r2" });
+    const r = await t.mutation(api.example.rename, { fromSlug: "from2", toSlug: "to2" });
+    expect(r).toEqual({ ok: true });
+  });
+});
+
+describe("slugs — NFC normalization (fix)", () => {
+  test("NFD and NFC forms of the same slug collide (SLUG_TAKEN)", async () => {
+    const t = setup();
+    // U+0065 + U+0301 (NFD: 'e' + combining acute) — visually identical to U+00E9
+    const nfdSlug = "é-handle";
+    // U+00E9 (NFC precomposed: 'é') — the composed form
+    const nfcSlug = "é-handle";
+    // reserve the NFD form — after NFC normalization it becomes the precomposed form
+    const r1 = await t.mutation(api.example.reserve, { slug: nfdSlug, resourceRef: "r1" });
+    expect(r1).toEqual({ ok: true });
+    // reserving the NFC equivalent must be rejected as SLUG_TAKEN
+    const r2 = await t.mutation(api.example.reserve, { slug: nfcSlug, resourceRef: "r2" });
+    expect(r2).toEqual({ ok: false, reason: "SLUG_TAKEN" });
+  });
+});
+
+describe("slugs — length boundary (exact)", () => {
+  test("slug at exactly minLength succeeds", async () => {
+    const t = setup();
+    // strictSlugs has minLength:3, maxLength:8, scope:"strict"
+    const r = await t.mutation(api.example.reserveStrict, { slug: "abc", resourceRef: "x" });
+    expect(r).toEqual({ ok: true });
+  });
+
+  test("slug at exactly maxLength succeeds", async () => {
+    const t = setup();
+    // strictSlugs maxLength:8 — exactly 8 chars
+    const r = await t.mutation(api.example.reserveStrict, { slug: "abcd-efg", resourceRef: "y" });
+    expect(r).toEqual({ ok: true });
+  });
+});
+
+describe("slugs — redirect scope isolation", () => {
+  test("same fromSlug in two scopes resolves independently", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, {
+      slug: "handle",
+      resourceRef: "r1",
+      scope: "scopeA",
+    });
+    await t.mutation(api.example.reserve, {
+      slug: "handle",
+      resourceRef: "r2",
+      scope: "scopeB",
+    });
+    await t.mutation(api.example.rename, {
+      fromSlug: "handle",
+      toSlug: "handle-v2",
+      scope: "scopeA",
+    });
+    await t.mutation(api.example.rename, {
+      fromSlug: "handle",
+      toSlug: "handle-v3",
+      scope: "scopeB",
+    });
+    expect(await t.query(api.example.redirectFor, { slug: "handle", scope: "scopeA" })).toBe(
+      "handle-v2",
+    );
+    expect(await t.query(api.example.redirectFor, { slug: "handle", scope: "scopeB" })).toBe(
+      "handle-v3",
+    );
+  });
+});

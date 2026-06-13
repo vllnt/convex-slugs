@@ -31,6 +31,9 @@ state.
 - **Case folding** — case-insensitive handles by default; opt out per client.
 - **Input rules** — configurable length bounds, charset `pattern`, and `reservedWords`; typed rejection reasons.
 - **Chain-safe redirects** — renaming repoints existing redirects so `redirectFor` always lands on the live slug, one row per source.
+- **Release cleans up redirects** — releasing a slug also deletes all inbound redirects pointing at it, so `redirectFor` returns `null` instead of a dead target.
+- **Self-rename guard** — renaming a slug to itself is rejected with `SLUG_TAKEN` before any DB read.
+- **Unicode NFC normalization** — slugs are NFC-normalized before trimming and case-folding, preventing visually-identical slugs with different compositions from registering as distinct.
 - **Degrades, never throws** — reads use `.first()`, so a stray duplicate row returns a value instead of erroring.
 - **Opaque refs** — `resourceRef` is an arbitrary host string; the component never inspects it.
 
@@ -108,8 +111,13 @@ A slug that is empty/whitespace, outside `minLength`..`maxLength`, or fails `pat
 is rejected `SLUG_INVALID`; one in `reservedWords` is rejected `SLUG_RESERVED`.
 Validation runs in the client against the resolved options, and the component
 re-guards length at the trust boundary. Renames repoint redirect chains so
-`redirectFor` always lands on the live slug (A→B→C ⇒ `redirectFor(A) === C`), and
-reads use `.first()` so a stray duplicate row degrades rather than throwing.
+`redirectFor` always lands on the live slug (A→B→C ⇒ `redirectFor(A) === C`); at
+most one redirect row is kept per `(scope, fromSlug)`. Releasing a slug also deletes
+all inbound redirects pointing at it so `redirectFor` returns `null` after release.
+Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any DB read.
+Slugs are Unicode NFC-normalized before trimming and case-folding; visually-identical
+forms with different compositions collide as expected. Reads use `.first()` so a stray
+duplicate row degrades rather than throwing.
 
 ## React
 
@@ -189,9 +197,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- Initial scaffold.
+- `release` now deletes all `redirects` rows whose `toSlug` equals the released slug,
+  so `redirectFor(old)` returns `null` instead of a dead target after release. Uses the
+  existing `by_scope_to` index.
+- `rename` gains an explicit self-rename guard (`fromSlug === toSlug` → `SLUG_TAKEN`)
+  at the top of the handler, before any DB read.
+- `normalizeSlug` now applies `String.prototype.normalize("NFC")` before trimming, so
+  visually-identical slugs with different Unicode compositions collide as expected.
+- `redirectFor` query: removed a dead `.order("desc")` call (at most one row per
+  `(scope, fromSlug)` — the call was misleading with no effect).
 
 ## [0.1.0] - 2026-06-12
 
@@ -238,6 +254,11 @@ const slugs = new Slugs(components.slugs, {
 All methods take the host `ctx` (a query or mutation context) as the first
 argument. `scope` is optional and defaults to `defaultScope`.
 
+**Normalization pipeline:** raw slug → `String.prototype.normalize("NFC")` → `.trim()` →
+optional `.toLowerCase()` (when `foldCase: true`). This ensures visually-identical slugs
+with different Unicode compositions (e.g. precomposed vs. combining-character forms) are
+treated as the same string.
+
 ## Validation reasons
 
 A rejected write returns `{ ok: false, reason }`. `reason` is a typed
@@ -265,15 +286,19 @@ redirect (the slug is a live name again).
 
 ### `release(ctx, slug, scope?) → null`
 
-Release `slug`. Idempotent — releasing an unheld slug is a no-op.
+Release `slug`. Idempotent — releasing an unheld slug is a no-op. Also deletes all
+`redirects` rows whose `toSlug` equals the released slug, so `redirectFor(old)` returns
+`null` after release instead of pointing at a dead target.
 
 ### `rename(ctx, fromSlug, toSlug, scope?) → { ok, reason? }`
 
 Move `fromSlug` to `toSlug` and record an old → new redirect. Returns
 `SLUG_INVALID` (bad `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not held), or
-`SLUG_TAKEN` (`toSlug` already held). Existing redirects that pointed at
-`fromSlug` are repointed to `toSlug`, so a chain A→B→C collapses to A→C; at most
-one redirect row is kept per `(scope, fromSlug)`.
+`SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`). Self-rename
+(`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any DB read.
+Existing redirects that pointed at `fromSlug` are repointed to `toSlug`, so a
+chain A→B→C collapses to A→C; at most one redirect row is kept per
+`(scope, fromSlug)`.
 
 ## Queries
 
@@ -335,13 +360,17 @@ export interface SlugConstraints {
  * Normalize a slug for storage/lookup. `foldCase` lowercases (the default —
  * handles are case-insensitive); when false the raw case is preserved.
  *
+ * Applies Unicode NFC normalization before trimming so visually-identical
+ * slugs with different compositions (e.g. precomposed vs. combining-character
+ * forms) are treated as the same string.
+ *
  * @param slug - Raw, host-supplied slug.
  * @param foldCase - Lowercase before comparison when `true`.
- * @returns The trimmed (and optionally lowercased) slug.
+ * @returns The NFC-normalized, trimmed (and optionally lowercased) slug.
  */
 export function normalizeSlug(slug: string, foldCase: boolean): string {
-  const trimmed = slug.trim();
-  return foldCase ? trimmed.toLowerCase() : trimmed;
+  const normalized = slug.normalize("NFC").trim();
+  return foldCase ? normalized.toLowerCase() : normalized;
 }
 
 /**
@@ -770,7 +799,9 @@ export const reserve = mutation({
 /**
  * Release `slug` from `scope`. Idempotent — releasing an unheld slug is a no-op.
  * Uses `.first()` so a stray duplicate row degrades to releasing one row instead
- * of throwing.
+ * of throwing. Also deletes all `redirects` rows whose `toSlug` equals the
+ * released slug so that `redirectFor(old)` returns `null` after release rather
+ * than pointing at a now-dead target.
  *
  * @returns `null`.
  */
@@ -787,6 +818,15 @@ export const release = mutation({
     if (existing !== null) {
       await ctx.db.delete(existing._id);
     }
+    const inbound = await ctx.db
+      .query("redirects")
+      .withIndex("by_scope_to", (q) =>
+        q.eq("scope", args.scope).eq("toSlug", args.slug),
+      )
+      .collect();
+    for (const row of inbound) {
+      await ctx.db.delete(row._id);
+    }
     return null;
   },
 });
@@ -798,9 +838,12 @@ export const release = mutation({
  * chain A→B→C collapses to A→C), and a single redirect row per `(scope,
  * fromSlug)` is upserted (patched if present, else inserted) to bound growth.
  *
+ * Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any
+ * DB read, preventing a self-loop redirect from being created.
+ *
  * @returns `{ ok: true }`, or `{ ok: false, reason }` where reason is
  * `SLUG_INVALID` (empty/over length `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not
- * held), or `SLUG_TAKEN` (`toSlug` already held).
+ * held), or `SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`).
  */
 export const rename = mutation({
   args: {
@@ -811,6 +854,9 @@ export const rename = mutation({
   },
   returns: reserveResult,
   handler: async (ctx, args) => {
+    if (args.fromSlug === args.toSlug) {
+      return { ok: false, reason: "SLUG_TAKEN" as const };
+    }
     if (args.toSlug.length < Math.max(1, args.bounds.minLength)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
@@ -955,7 +1001,6 @@ export const redirectFor = query({
       .withIndex("by_scope_from", (q) =>
         q.eq("scope", args.scope).eq("fromSlug", args.slug),
       )
-      .order("desc")
       .first();
     return row === null ? null : row.toSlug;
   },

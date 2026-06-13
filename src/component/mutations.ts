@@ -56,7 +56,9 @@ export const reserve = mutation({
 /**
  * Release `slug` from `scope`. Idempotent — releasing an unheld slug is a no-op.
  * Uses `.first()` so a stray duplicate row degrades to releasing one row instead
- * of throwing.
+ * of throwing. Also deletes all `redirects` rows whose `toSlug` equals the
+ * released slug so that `redirectFor(old)` returns `null` after release rather
+ * than pointing at a now-dead target.
  *
  * @returns `null`.
  */
@@ -73,6 +75,15 @@ export const release = mutation({
     if (existing !== null) {
       await ctx.db.delete(existing._id);
     }
+    const inbound = await ctx.db
+      .query("redirects")
+      .withIndex("by_scope_to", (q) =>
+        q.eq("scope", args.scope).eq("toSlug", args.slug),
+      )
+      .collect();
+    for (const row of inbound) {
+      await ctx.db.delete(row._id);
+    }
     return null;
   },
 });
@@ -84,9 +95,12 @@ export const release = mutation({
  * chain A→B→C collapses to A→C), and a single redirect row per `(scope,
  * fromSlug)` is upserted (patched if present, else inserted) to bound growth.
  *
+ * Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any
+ * DB read, preventing a self-loop redirect from being created.
+ *
  * @returns `{ ok: true }`, or `{ ok: false, reason }` where reason is
  * `SLUG_INVALID` (empty/over length `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not
- * held), or `SLUG_TAKEN` (`toSlug` already held).
+ * held), or `SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`).
  */
 export const rename = mutation({
   args: {
@@ -97,6 +111,9 @@ export const rename = mutation({
   },
   returns: reserveResult,
   handler: async (ctx, args) => {
+    if (args.fromSlug === args.toSlug) {
+      return { ok: false, reason: "SLUG_TAKEN" as const };
+    }
     if (args.toSlug.length < Math.max(1, args.bounds.minLength)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }

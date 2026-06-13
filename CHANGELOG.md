@@ -6,9 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Added
+### Fixed
 
-- Initial scaffold.
+- `release` now deletes all `redirects` rows whose `toSlug` equals the released slug,
+  so `redirectFor(old)` returns `null` instead of a dead target after release. Uses the
+  existing `by_scope_to` index.
+- `rename` gains an explicit self-rename guard (`fromSlug === toSlug` → `SLUG_TAKEN`)
+  at the top of the handler, before any DB read.
+- `normalizeSlug` now applies `String.prototype.normalize("NFC")` before trimming, so
+  visually-identical slugs with different Unicode compositions collide as expected.
+- `redirectFor` query: removed a dead `.order("desc")` call (at most one row per
+  `(scope, fromSlug)` — the call was misleading with no effect).
 
 ## [0.1.0] - 2026-06-12
 

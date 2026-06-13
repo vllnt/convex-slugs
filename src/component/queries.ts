@@ -38,7 +38,6 @@ export const redirectFor = query({
       .withIndex("by_scope_from", (q) =>
         q.eq("scope", args.scope).eq("fromSlug", args.slug),
       )
-      .order("desc")
       .first();
     return row === null ? null : row.toSlug;
   },

@@ -36,13 +36,17 @@ export interface SlugConstraints {
  * Normalize a slug for storage/lookup. `foldCase` lowercases (the default —
  * handles are case-insensitive); when false the raw case is preserved.
  *
+ * Applies Unicode NFC normalization before trimming so visually-identical
+ * slugs with different compositions (e.g. precomposed vs. combining-character
+ * forms) are treated as the same string.
+ *
  * @param slug - Raw, host-supplied slug.
  * @param foldCase - Lowercase before comparison when `true`.
- * @returns The trimmed (and optionally lowercased) slug.
+ * @returns The NFC-normalized, trimmed (and optionally lowercased) slug.
  */
 export function normalizeSlug(slug: string, foldCase: boolean): string {
-  const trimmed = slug.trim();
-  return foldCase ? trimmed.toLowerCase() : trimmed;
+  const normalized = slug.normalize("NFC").trim();
+  return foldCase ? normalized.toLowerCase() : normalized;
 }
 
 /**

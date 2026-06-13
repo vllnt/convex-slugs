@@ -23,6 +23,9 @@ state.
 - **Case folding** — case-insensitive handles by default; opt out per client.
 - **Input rules** — configurable length bounds, charset `pattern`, and `reservedWords`; typed rejection reasons.
 - **Chain-safe redirects** — renaming repoints existing redirects so `redirectFor` always lands on the live slug, one row per source.
+- **Release cleans up redirects** — releasing a slug also deletes all inbound redirects pointing at it, so `redirectFor` returns `null` instead of a dead target.
+- **Self-rename guard** — renaming a slug to itself is rejected with `SLUG_TAKEN` before any DB read.
+- **Unicode NFC normalization** — slugs are NFC-normalized before trimming and case-folding, preventing visually-identical slugs with different compositions from registering as distinct.
 - **Degrades, never throws** — reads use `.first()`, so a stray duplicate row returns a value instead of erroring.
 - **Opaque refs** — `resourceRef` is an arbitrary host string; the component never inspects it.
 
@@ -100,8 +103,13 @@ A slug that is empty/whitespace, outside `minLength`..`maxLength`, or fails `pat
 is rejected `SLUG_INVALID`; one in `reservedWords` is rejected `SLUG_RESERVED`.
 Validation runs in the client against the resolved options, and the component
 re-guards length at the trust boundary. Renames repoint redirect chains so
-`redirectFor` always lands on the live slug (A→B→C ⇒ `redirectFor(A) === C`), and
-reads use `.first()` so a stray duplicate row degrades rather than throwing.
+`redirectFor` always lands on the live slug (A→B→C ⇒ `redirectFor(A) === C`); at
+most one redirect row is kept per `(scope, fromSlug)`. Releasing a slug also deletes
+all inbound redirects pointing at it so `redirectFor` returns `null` after release.
+Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any DB read.
+Slugs are Unicode NFC-normalized before trimming and case-folding; visually-identical
+forms with different compositions collide as expected. Reads use `.first()` so a stray
+duplicate row degrades rather than throwing.
 
 ## React
 

@@ -17,6 +17,11 @@ const slugs = new Slugs(components.slugs, {
 All methods take the host `ctx` (a query or mutation context) as the first
 argument. `scope` is optional and defaults to `defaultScope`.
 
+**Normalization pipeline:** raw slug → `String.prototype.normalize("NFC")` → `.trim()` →
+optional `.toLowerCase()` (when `foldCase: true`). This ensures visually-identical slugs
+with different Unicode compositions (e.g. precomposed vs. combining-character forms) are
+treated as the same string.
+
 ## Validation reasons
 
 A rejected write returns `{ ok: false, reason }`. `reason` is a typed
@@ -44,15 +49,19 @@ redirect (the slug is a live name again).
 
 ### `release(ctx, slug, scope?) → null`
 
-Release `slug`. Idempotent — releasing an unheld slug is a no-op.
+Release `slug`. Idempotent — releasing an unheld slug is a no-op. Also deletes all
+`redirects` rows whose `toSlug` equals the released slug, so `redirectFor(old)` returns
+`null` after release instead of pointing at a dead target.
 
 ### `rename(ctx, fromSlug, toSlug, scope?) → { ok, reason? }`
 
 Move `fromSlug` to `toSlug` and record an old → new redirect. Returns
 `SLUG_INVALID` (bad `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not held), or
-`SLUG_TAKEN` (`toSlug` already held). Existing redirects that pointed at
-`fromSlug` are repointed to `toSlug`, so a chain A→B→C collapses to A→C; at most
-one redirect row is kept per `(scope, fromSlug)`.
+`SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`). Self-rename
+(`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any DB read.
+Existing redirects that pointed at `fromSlug` are repointed to `toSlug`, so a
+chain A→B→C collapses to A→C; at most one redirect row is kept per
+`(scope, fromSlug)`.
 
 ## Queries
 
