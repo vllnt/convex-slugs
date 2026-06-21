@@ -70,7 +70,6 @@ src/
 | `README.md` | API shape, features, install instructions, or peer dep range changes |
 | `docs/API.md` | Any public method signature, return shape, or validation reason changes |
 | `llms.txt` | `convex` peer dep range changes; new `## Optional` entries |
-| `llms-full.txt` | Always via `pnpm generate:llms` (regenerated, not hand-edited) |
 | `CHANGELOG.md` | Every release |
 
 ## Conventions
