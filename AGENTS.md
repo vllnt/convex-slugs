@@ -11,8 +11,13 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 # @vllnt/convex-slugs
 
 `@vllnt/convex-slugs` is a Convex component: unique slug and handle registry with rename redirects.
-It follows the vllnt Component Standard (see the `convex-components` hub
-`.claude/rules/component-standard.md`).
+It follows the vllnt Component Standard (see the `oss-packages` hub
+`AGENTS.md`).
+
+## Agent instructions
+
+`AGENTS.md` is the sole agent-instruction source for this repository. Do not add
+`CLAUDE.md` or `.claude` content.
 
 ## Architecture
 
@@ -80,3 +85,9 @@ src/
 - Host data via typed generics / host-supplied validator keyed by an opaque ref — never `v.any()` dumps.
 - 100% test coverage is BLOCKING (`vitest.config.mts` thresholds).
 - Runtime deps: only official `@convex-dev/*` + `@vllnt/*`.
+
+## Generated code
+
+- Every `**/_generated/**` file is owned exclusively by Convex CLI codegen.
+- Never create, edit, lint, or format generated files manually.
+- Run `pnpm codegen` to regenerate them and commit the generated output unchanged.
