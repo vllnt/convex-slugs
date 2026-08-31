@@ -42,7 +42,7 @@ export const reserve = mutation({
       )
       .collect();
     for (const row of dangling) {
-      await ctx.db.delete(row._id);
+      await ctx.db.delete("redirects", row._id);
     }
     await ctx.db.insert("slugs", {
       scope: args.scope,
@@ -73,7 +73,7 @@ export const release = mutation({
       )
       .first();
     if (existing !== null) {
-      await ctx.db.delete(existing._id);
+      await ctx.db.delete("slugs", existing._id);
     }
     const inbound = await ctx.db
       .query("redirects")
@@ -82,7 +82,7 @@ export const release = mutation({
       )
       .collect();
     for (const row of inbound) {
-      await ctx.db.delete(row._id);
+      await ctx.db.delete("redirects", row._id);
     }
     return null;
   },
@@ -138,7 +138,7 @@ export const rename = mutation({
     if (taken !== null) {
       return { ok: false, reason: "SLUG_TAKEN" as const };
     }
-    await ctx.db.patch(from._id, { slug: args.toSlug });
+    await ctx.db.patch("slugs", from._id, { slug: args.toSlug });
 
     const inbound = await ctx.db
       .query("redirects")
@@ -147,7 +147,7 @@ export const rename = mutation({
       )
       .collect();
     for (const row of inbound) {
-      await ctx.db.patch(row._id, { toSlug: args.toSlug });
+      await ctx.db.patch("redirects", row._id, { toSlug: args.toSlug });
     }
 
     const existing = await ctx.db
@@ -157,7 +157,7 @@ export const rename = mutation({
       )
       .first();
     if (existing !== null) {
-      await ctx.db.patch(existing._id, { toSlug: args.toSlug });
+      await ctx.db.patch("redirects", existing._id, { toSlug: args.toSlug });
     } else {
       await ctx.db.insert("redirects", {
         scope: args.scope,
