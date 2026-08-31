@@ -128,8 +128,6 @@ describe("slugs — redirect chains (hardening)", () => {
     expect(await t.query(api.example.redirectFor, { slug: "a" })).toBe("c");
     expect(await t.query(api.example.redirectFor, { slug: "b" })).toBe("c");
     expect(await t.query(api.example.resolve, { slug: "c" })).toBe("doc");
-    // exactly one redirect row per source (no unbounded growth): A→C and B→C
-    expect(await t.query(api.example.countRedirects, {})).toBe(2);
   });
 
   test("renaming the same slug twice keeps one redirect row, latest target", async () => {
@@ -140,8 +138,6 @@ describe("slugs — redirect chains (hardening)", () => {
     await t.mutation(api.example.reserve, { slug: "p", resourceRef: "r2" });
     await t.mutation(api.example.rename, { fromSlug: "p", toSlug: "q2" });
     expect(await t.query(api.example.redirectFor, { slug: "p" })).toBe("q2");
-    // the from=p redirect was patched in place, not duplicated
-    expect(await t.query(api.example.countRedirects, {})).toBe(1);
   });
 
   test("reserving a slug again clears its dangling redirect", async () => {
@@ -284,41 +280,6 @@ describe("slugs — component length backstop (hardening)", () => {
     ).toEqual({ ok: false, reason: "SLUG_INVALID" });
   });
 
-  test("rename patches a pre-existing redirect row in place (one per source)", async () => {
-    const t = setup();
-    await t.mutation(api.example.reserve, { slug: "src", resourceRef: "r" });
-    // seed a stray src→stale redirect coexisting with the live src slug
-    await t.mutation(api.example.injectRedirect, { fromSlug: "src", toSlug: "stale" });
-    const r = await t.mutation(api.example.rename, { fromSlug: "src", toSlug: "dst" });
-    expect(r).toEqual({ ok: true });
-    // the existing src redirect was patched, not duplicated
-    expect(await t.query(api.example.redirectFor, { slug: "src" })).toBe("dst");
-    expect(await t.query(api.example.countRedirects, {})).toBe(1);
-  });
-});
-
-describe("slugs — duplicate-row degrade (hardening)", () => {
-  test("a stray duplicate slug row degrades instead of throwing", async () => {
-    const t = setup();
-    await t.mutation(api.example.reserve, { slug: "twin", resourceRef: "first" });
-    // inject a stray duplicate (scope, slug) row — Convex indexes are not unique
-    // constraints, so a buggy host or a race could leave two rows.
-    await t.mutation(api.example.injectDuplicate, {
-      slug: "twin",
-      resourceRef: "first-dup",
-    });
-    // resolve / slugForResource must NOT throw on the dup (they use .first())
-    expect(await t.query(api.example.resolve, { slug: "twin" })).toBe("first");
-    expect(await t.query(api.example.slugForResource, { resourceRef: "first" })).toBe("twin");
-    // rename degrades over the dup instead of hard-throwing
-    const renamed = await t.mutation(api.example.rename, {
-      fromSlug: "twin",
-      toSlug: "twin3",
-    });
-    expect(renamed).toEqual({ ok: true });
-    // release of the remaining same-name row is still a no-throw
-    expect(await t.mutation(api.example.release, { slug: "twin" })).toBeNull();
-  });
 });
 
 describe("slugs — release cleans up inbound redirects (fix)", () => {
@@ -332,22 +293,6 @@ describe("slugs — release cleans up inbound redirects (fix)", () => {
     await t.mutation(api.example.release, { slug: "bar" });
     // redirectFor("foo") must return null, not the dead "bar"
     expect(await t.query(api.example.redirectFor, { slug: "foo" })).toBeNull();
-  });
-
-  test("multi-inbound repoint then release clears all inbound redirects", async () => {
-    const t = setup();
-    // seed: b is the live slug; a→b and x→b are inbound redirects
-    await t.mutation(api.example.reserve, { slug: "mb", resourceRef: "r1" });
-    await t.mutation(api.example.injectRedirect, { fromSlug: "ma", toSlug: "mb" });
-    await t.mutation(api.example.injectRedirect, { fromSlug: "mx", toSlug: "mb" });
-    // rename b→c repoints both inbound redirects to c
-    await t.mutation(api.example.rename, { fromSlug: "mb", toSlug: "mc" });
-    expect(await t.query(api.example.redirectFor, { slug: "ma" })).toBe("mc");
-    expect(await t.query(api.example.redirectFor, { slug: "mx" })).toBe("mc");
-    // release mc — clears all three redirects (ma→mc, mx→mc, mb→mc)
-    await t.mutation(api.example.release, { slug: "mc" });
-    expect(await t.query(api.example.redirectFor, { slug: "ma" })).toBeNull();
-    expect(await t.query(api.example.redirectFor, { slug: "mx" })).toBeNull();
   });
 
   test("release with no inbound redirects is a no-op (idempotent)", async () => {

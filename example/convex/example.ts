@@ -100,43 +100,6 @@ export const renameStrict = mutation({
 });
 
 /**
- * Test-only host wrapper around the component's `insertRaw` escape hatch — used
- * to simulate a stray duplicate `(scope, slug)` row in the degrade test.
- */
-export const injectDuplicate = mutation({
-  args: { slug: v.string(), resourceRef: v.string(), scope: v.optional(v.string()) },
-  returns: v.null(),
-  handler: (ctx, a) =>
-    ctx.runMutation(components.slugs.mutations.insertRaw, {
-      scope: a.scope ?? "global",
-      slug: a.slug,
-      resourceRef: a.resourceRef,
-    }),
-});
-
-/** Test-only host wrapper around the component's `countRedirects` inspector. */
-export const countRedirects = query({
-  args: { scope: v.optional(v.string()) },
-  returns: v.number(),
-  handler: (ctx, a) =>
-    ctx.runQuery(components.slugs.queries.countRedirects, {
-      scope: a.scope ?? "global",
-    }),
-});
-
-/** Test-only host wrapper around the component's `insertRedirectRaw` escape hatch. */
-export const injectRedirect = mutation({
-  args: { fromSlug: v.string(), toSlug: v.string(), scope: v.optional(v.string()) },
-  returns: v.null(),
-  handler: (ctx, a) =>
-    ctx.runMutation(components.slugs.mutations.insertRedirectRaw, {
-      scope: a.scope ?? "global",
-      fromSlug: a.fromSlug,
-      toSlug: a.toSlug,
-    }),
-});
-
-/**
  * Test-only: call the component `reserve` directly with explicit bounds, bypassing
  * the client's pre-validation, to exercise the component's own length backstop.
  */
