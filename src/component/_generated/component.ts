@@ -43,10 +43,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           ok: boolean;
           reason?:
-            | "SLUG_TAKEN"
-            | "SLUG_NOT_FOUND"
-            | "SLUG_INVALID"
-            | "SLUG_RESERVED";
+            "SLUG_TAKEN" | "SLUG_NOT_FOUND" | "SLUG_INVALID" | "SLUG_RESERVED";
         },
         Name
       >;
@@ -62,10 +59,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           ok: boolean;
           reason?:
-            | "SLUG_TAKEN"
-            | "SLUG_NOT_FOUND"
-            | "SLUG_INVALID"
-            | "SLUG_RESERVED";
+            "SLUG_TAKEN" | "SLUG_NOT_FOUND" | "SLUG_INVALID" | "SLUG_RESERVED";
         },
         Name
       >;
