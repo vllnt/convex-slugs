@@ -1,6 +1,6 @@
 # API Reference — @vllnt/convex-slugs
 
-**Compatibility:** `convex@^1.41.0`
+**Compatibility:** `convex@^1.45.0`; optional `react@>=18` for `./react`.
 
 Construct the client with the mounted component and optional config:
 
@@ -8,9 +8,9 @@ Construct the client with the mounted component and optional config:
 import { Slugs } from "@vllnt/convex-slugs";
 const slugs = new Slugs(components.slugs, {
   defaultScope: "global", // namespace applied when a call omits `scope`
-  foldCase: true,         // lowercase slugs before store/lookup
-  minLength: 1,           // reject shorter (after normalization) as SLUG_INVALID
-  maxLength: 256,         // reject longer as SLUG_INVALID
+  foldCase: true, // lowercase slugs before store/lookup
+  minLength: 1, // reject shorter (after normalization) as SLUG_INVALID
+  maxLength: 256, // reject longer as SLUG_INVALID
   pattern: /^[a-z0-9-]+$/, // optional charset; failing it is SLUG_INVALID
   reservedWords: ["admin"], // reject these (normalized) as SLUG_RESERVED
 });
@@ -19,22 +19,24 @@ const slugs = new Slugs(components.slugs, {
 All methods take the host `ctx` (a query or mutation context) as the first
 argument. `scope` is optional and defaults to `defaultScope`.
 
-**Normalization pipeline:** raw slug → `String.prototype.normalize("NFC")` → `.trim()` →
-optional `.toLowerCase()` (when `foldCase: true`). This ensures visually-identical slugs
-with different Unicode compositions (e.g. precomposed vs. combining-character forms) are
-treated as the same string.
+**Normalization pipeline:** raw slug → `String.prototype.normalize("NFC")` →
+`.trim()` → optional `.toLowerCase()` (when `foldCase: true`). This ensures
+visually-identical slugs with different Unicode compositions (e.g. precomposed
+vs. combining-character forms) are treated as the same string.
 
 ## Validation reasons
 
-A rejected write returns `{ ok: false, reason }`. `reason` is a typed
-string-literal union:
+Expected validation and conflict rejections return `{ ok: false, reason }`. This
+does not cover every failure: invalid regular-expression configuration, Convex
+validation, authorization in host wrappers, and runtime failures can throw.
+`reason` is a typed string-literal union:
 
-| Reason | When |
-|--------|------|
-| `SLUG_INVALID` | Empty/whitespace, outside `minLength`..`maxLength`, or fails `pattern`. |
-| `SLUG_RESERVED` | The normalized slug is in `reservedWords`. |
-| `SLUG_TAKEN` | The slug is already held in the scope. |
-| `SLUG_NOT_FOUND` | `rename` was called for a `fromSlug` that is not held. |
+| Reason           | When                                                                    |
+| ---------------- | ----------------------------------------------------------------------- |
+| `SLUG_INVALID`   | Empty/whitespace, outside `minLength`..`maxLength`, or fails `pattern`. |
+| `SLUG_RESERVED`  | The normalized slug is in `reservedWords`.                              |
+| `SLUG_TAKEN`     | The slug is already held in the scope.                                  |
+| `SLUG_NOT_FOUND` | `rename` was called for a `fromSlug` that is not held.                  |
 
 Validation runs in the client against the resolved options before any
 round-trip; the component re-guards length at the trust boundary even if a
@@ -51,19 +53,20 @@ redirect (the slug is a live name again).
 
 ### `release(ctx, slug, scope?) → null`
 
-Release `slug`. Idempotent — releasing an unheld slug is a no-op. Also deletes all
-`redirects` rows whose `toSlug` equals the released slug, so `redirectFor(old)` returns
-`null` after release instead of pointing at a dead target.
+Release `slug`. Idempotent — releasing an unheld slug is a no-op. Also deletes
+all `redirects` rows whose `toSlug` equals the released slug, so
+`redirectFor(old)` returns `null` after release instead of pointing at a dead
+target.
 
 ### `rename(ctx, fromSlug, toSlug, scope?) → { ok, reason? }`
 
 Move `fromSlug` to `toSlug` and record an old → new redirect. Returns
-`SLUG_INVALID` (bad `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not held), or
-`SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`). Self-rename
-(`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any DB read.
-Existing redirects that pointed at `fromSlug` are repointed to `toSlug`, so a
-chain A→B→C collapses to A→C; at most one redirect row is kept per
-`(scope, fromSlug)`.
+`SLUG_INVALID` (bad `toSlug`), `SLUG_RESERVED` (reserved `toSlug`),
+`SLUG_NOT_FOUND` (`fromSlug` not held), or `SLUG_TAKEN` (`toSlug` already held
+or equals `fromSlug`). Self-rename (`fromSlug === toSlug`) is rejected with
+`SLUG_TAKEN` before any DB read. Existing redirects that pointed at `fromSlug`
+are repointed to `toSlug`, so a chain A→B→C collapses to A→C; at most one
+redirect row is kept per `(scope, fromSlug)`.
 
 ## Queries
 
