@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type {
   FunctionArgs,
   FunctionReference,
@@ -99,11 +100,27 @@ export class Slugs {
   ) {
     this.defaultScope = options.defaultScope ?? DEFAULT_SCOPE;
     this.foldCase = options.foldCase ?? true;
+    const minLength = options.minLength ?? DEFAULT_MIN_LENGTH;
+    const maxLength = options.maxLength ?? DEFAULT_MAX_LENGTH;
+    if (
+      this.defaultScope === "" ||
+      !Number.isInteger(minLength) ||
+      !Number.isInteger(maxLength) ||
+      minLength < 0 ||
+      maxLength < Math.max(1, minLength)
+    ) {
+      throw new ConvexError({
+        code: "INVALID_OPTIONS",
+        message:
+          "Slugs options: defaultScope must be non-empty; minLength and maxLength must be integers with 0 <= minLength <= maxLength and maxLength >= 1",
+      });
+    }
     this.constraints = {
-      minLength: options.minLength ?? DEFAULT_MIN_LENGTH,
-      maxLength: options.maxLength ?? DEFAULT_MAX_LENGTH,
+      minLength,
+      maxLength,
       pattern: options.pattern,
-      reservedWords: options.reservedWords ?? [],
+      // Match reserved words on the same normalized form as slugs.
+      reservedWords: (options.reservedWords ?? []).map((w) => this.norm(w)),
     };
   }
 

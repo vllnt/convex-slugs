@@ -68,6 +68,11 @@ export function validateSlug(slug: string, c: SlugConstraints): SlugReason | nul
   if (slug.length > c.maxLength) {
     return "SLUG_INVALID";
   }
+  if (c.pattern !== undefined) {
+    // A global/sticky RegExp keeps `lastIndex` between calls; reset it so the
+    // same slug always gets the same verdict.
+    c.pattern.lastIndex = 0;
+  }
   if (c.pattern !== undefined && !c.pattern.test(slug)) {
     return "SLUG_INVALID";
   }
