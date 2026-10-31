@@ -45,8 +45,9 @@ pnpm add @vllnt/convex-slugs
 ```
 
 Requires `convex@^1.45.0`; React `>=18` is optional for `./react` only. The
-command installs `latest` (`0.1.0`); use `@vllnt/convex-slugs@canary` for the
-current prerelease. Pin a resolved canary version for reproducible installs.
+command installs the stable release. Prereleases are published under the
+`canary` tag (`@vllnt/convex-slugs@canary`); pin a resolved canary version for
+reproducible installs.
 
 ## Usage
 
@@ -138,6 +139,9 @@ only.
   are sandboxed (reached only via the client).
 - **Boundary re-guard** — the component re-guards length at the trust boundary
   even if a caller bypasses the client.
+- **Uniqueness under concurrency** — each `reserve`/`rename` is one Convex
+  mutation (serializable): of simultaneous claims on a slug, one succeeds and
+  the rest get `SLUG_TAKEN`.
 
 See [docs/API.md](docs/API.md).
 
@@ -150,6 +154,22 @@ pnpm test:coverage  # enforced 100% on covered files
 
 Tests run against the real component runtime via `convex-test`
 (`@edge-runtime/vm`), not mocks.
+
+### Testing your app
+
+`@vllnt/convex-slugs/test` exports `register(t, name = "slugs")` to mount the
+component in a `convex-test` instance. It needs `convex-test` and `vitest` (with
+Vite's `import.meta.glob`) in the consuming app:
+
+```ts
+/// <reference types="vite/client" />
+import { convexTest } from "convex-test";
+import { register } from "@vllnt/convex-slugs/test";
+import schema from "./schema";
+
+const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+register(t);
+```
 
 ## Contributing
 

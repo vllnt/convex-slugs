@@ -12,7 +12,7 @@ import type { FunctionReference } from "convex/server";
 import { useQuery } from "convex/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useResolve, useSlugAvailable } from "./index";
+import { useResolve, useSlugAvailable } from "./index.js";
 
 vi.mock("convex/react", () => ({
   useQuery: vi.fn(),
