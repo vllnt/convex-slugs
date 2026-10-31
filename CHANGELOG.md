@@ -1,31 +1,42 @@
 # Changelog
 
 All notable changes to this project are documented here. The format is based on
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
+adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- Treat Convex `_generated` output as CLI-owned, exclude it from formatting, and expose a
-  dedicated codegen script.
-- Refresh all direct dependencies to their latest compatible releases for canary validation.
-- Require `convex@^1.45.0` and update `convex-test` to `^0.0.56`.
+## [0.1.1] - Unreleased
 
 ### Fixed
 
-- `release` now deletes all `redirects` rows whose `toSlug` equals the released slug,
-  so `redirectFor(old)` returns `null` instead of a dead target after release. Uses the
-  existing `by_scope_to` index.
-- `rename` gains an explicit self-rename guard (`fromSlug === toSlug` → `SLUG_TAKEN`)
-  at the top of the handler, before any DB read.
-- `normalizeSlug` now applies `String.prototype.normalize("NFC")` before trimming, so
-  visually-identical slugs with different Unicode compositions collide as expected.
-- `redirectFor` query: removed a dead `.order("desc")` call (at most one row per
-  `(scope, fromSlug)` — the call was misleading with no effect).
+- `rename` no longer leaves a self-redirect when a slug is renamed back to an
+  earlier name (A→B, then B→A left `redirectFor(A) === A` on a live slug). A
+  redirect starting at the new live name is now removed.
+- Reserved words are normalized like slugs, so `reservedWords: ["Admin"]` blocks
+  `admin` (previously never matched when `foldCase` was on).
+- A `pattern` with the `g` or `y` flag gives the same verdict on every call
+  instead of alternating.
+- `@vllnt/convex-slugs/test` type-checks for consumers under `nodenext` and
+  `bundler` resolution (`vite/client` reference, `.js` suffixes on relative
+  imports).
+- Test files are no longer included in the published package.
 
-## [0.1.0] - 2026-06-12
+### Added
+
+- Invalid input is rejected with a `ConvexError`: `INVALID_OPTIONS` from
+  `new Slugs(...)` (empty `defaultScope`, `minLength`/`maxLength` that are not
+  integers, or inverted), and `INVALID_ARGUMENT` from component mutations (empty
+  `scope`/`resourceRef`, invalid `bounds`). A `NaN` `maxLength` used to disable
+  the length cap.
+
+### Changed
+
+- Docs: README install command targets the stable release, "Testing your app",
+  error table, concurrency and normalization limits.
+- Release flow: npm trusted publishing with provenance; `@latest` only from a
+  `vX.Y.Z` tag on `main`. Pinned CI actions, pnpm 10 with a release-age gate,
+  low-memory dev defaults.
+
+## [0.1.0] - 2026-09-01
 
 ### Added
 
@@ -45,3 +56,20 @@ All notable changes to this project are documented here. The format is based on
   dangling redirect.
 - Registry reads use `.first()` instead of `.unique()` so a stray duplicate row
   degrades to a value rather than throwing.
+
+### Changed
+
+- Treat Convex `_generated` output as CLI-owned, exclude it from formatting, and
+  expose a dedicated codegen script.
+- Require `convex@^1.45.0` and update `convex-test` to `^0.0.56`.
+
+### Fixed
+
+- `release` deletes all `redirects` rows whose `toSlug` equals the released
+  slug, so `redirectFor(old)` returns `null` instead of a dead target after
+  release.
+- `rename` rejects a self-rename (`fromSlug === toSlug`) with `SLUG_TAKEN`
+  before any DB read.
+- `normalizeSlug` applies Unicode NFC before trimming, so visually-identical
+  slugs with different compositions collide as expected.
+- `redirectFor` no longer carries a dead `.order("desc")` call.

@@ -1,6 +1,6 @@
 {
   "name": "@vllnt/convex-slugs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unique slug and handle registry with rename redirects, as a Convex component",
   "license": "MIT",
   "type": "module",
