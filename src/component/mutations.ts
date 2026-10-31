@@ -1,6 +1,32 @@
-import { v } from "convex/values";
-import { internalMutation, mutation } from "./_generated/server";
-import { lengthBounds, reserveResult } from "./validators";
+import { ConvexError, v } from "convex/values";
+import { internalMutation, mutation } from "./_generated/server.js";
+import { lengthBounds, reserveResult } from "./validators.js";
+
+/**
+ * Reject malformed arguments with `ConvexError({ code: "INVALID_ARGUMENT" })`.
+ * Expected slug rejections stay typed `{ ok: false, reason }` results; this
+ * covers input no correct client sends (empty scope/ref, non-integer bounds).
+ */
+function assertArgs(args: {
+  scope: string;
+  resourceRef?: string;
+  bounds?: { minLength: number; maxLength: number };
+}): void {
+  const { scope, resourceRef, bounds } = args;
+  const badBounds =
+    bounds !== undefined &&
+    !(
+      Number.isInteger(bounds.minLength) &&
+      Number.isInteger(bounds.maxLength) &&
+      bounds.minLength <= bounds.maxLength
+    );
+  if (scope === "" || resourceRef === "" || badBounds) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "scope and resourceRef must be non-empty; bounds must be integers with min <= max",
+    });
+  }
+}
 
 /**
  * Reserve `slug` for `resourceRef` within `scope`. The slug arrives already
@@ -20,6 +46,7 @@ export const reserve = mutation({
   },
   returns: reserveResult,
   handler: async (ctx, args) => {
+    assertArgs(args);
     if (args.slug.length < Math.max(1, args.bounds.minLength)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
@@ -66,6 +93,7 @@ export const release = mutation({
   args: { scope: v.string(), slug: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    assertArgs(args);
     const existing = await ctx.db
       .query("slugs")
       .withIndex("by_scope_slug", (q) =>
@@ -95,6 +123,9 @@ export const release = mutation({
  * chain A→B→C collapses to A→C), and a single redirect row per `(scope,
  * fromSlug)` is upserted (patched if present, else inserted) to bound growth.
  *
+ * Any redirect leaving `toSlug` is removed (it is a live name again), so no
+ * redirect ever starts at a live slug.
+ *
  * Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any
  * DB read, preventing a self-loop redirect from being created.
  *
@@ -111,6 +142,7 @@ export const rename = mutation({
   },
   returns: reserveResult,
   handler: async (ctx, args) => {
+    assertArgs(args);
     if (args.fromSlug === args.toSlug) {
       return { ok: false, reason: "SLUG_TAKEN" as const };
     }
@@ -139,6 +171,18 @@ export const rename = mutation({
       return { ok: false, reason: "SLUG_TAKEN" as const };
     }
     await ctx.db.patch("slugs", from._id, { slug: args.toSlug });
+
+    // `toSlug` is a live name again: drop its own redirect first, so renaming
+    // back (A->B, B->A) cannot repoint it into a self-loop A->A below.
+    const stale = await ctx.db
+      .query("redirects")
+      .withIndex("by_scope_from", (q) =>
+        q.eq("scope", args.scope).eq("fromSlug", args.toSlug),
+      )
+      .collect();
+    for (const row of stale) {
+      await ctx.db.delete("redirects", row._id);
+    }
 
     const inbound = await ctx.db
       .query("redirects")
