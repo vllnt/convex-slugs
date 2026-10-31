@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery, query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server.js";
 
 /**
  * Resolve `slug` to the `resourceRef` currently holding it within `scope`, or
