@@ -24,6 +24,12 @@ argument. `scope` is optional and defaults to `defaultScope`.
 visually-identical slugs with different Unicode compositions (e.g. precomposed
 vs. combining-character forms) are treated as the same string.
 
+Limits to know: `minLength`/`maxLength` count UTF-16 code units (an emoji is 2),
+and there is no compatibility folding (NFKC), confusable detection, or
+zero-width-character stripping. Use `pattern` (for example `/^[a-z0-9-]+$/`) to
+restrict the alphabet. Reserved words are normalized the same way as slugs, so
+`reservedWords: ["Admin"]` blocks `admin`.
+
 ## Validation reasons
 
 Expected validation and conflict rejections return `{ ok: false, reason }`. This
@@ -41,6 +47,22 @@ validation, authorization in host wrappers, and runtime failures can throw.
 Validation runs in the client against the resolved options before any
 round-trip; the component re-guards length at the trust boundary even if a
 caller bypasses the client.
+
+## Errors
+
+Malformed input throws a `ConvexError` whose `data.code` is stable:
+
+| Code               | Thrown by           | When                                                                                              |
+| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`  | `new Slugs(...)`    | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `0 <= minLength <= maxLength`. |
+| `INVALID_ARGUMENT` | component mutations | Empty `scope` or `resourceRef`, or `bounds` that are not integers with `minLength <= maxLength`.  |
+
+## Concurrency
+
+`reserve` and `rename` each run as one Convex mutation, which is serializable.
+When several callers claim the same slug at once, exactly one succeeds and the
+others receive `SLUG_TAKEN`. Convex indexes are not unique constraints, so
+always claim through these mutations.
 
 ## Mutations
 
@@ -66,7 +88,9 @@ Move `fromSlug` to `toSlug` and record an old → new redirect. Returns
 or equals `fromSlug`). Self-rename (`fromSlug === toSlug`) is rejected with
 `SLUG_TAKEN` before any DB read. Existing redirects that pointed at `fromSlug`
 are repointed to `toSlug`, so a chain A→B→C collapses to A→C; at most one
-redirect row is kept per `(scope, fromSlug)`.
+redirect row is kept per `(scope, fromSlug)`. Renaming back to an earlier name
+(A→B, then B→A) removes the redirect that left A, so a live slug never has a
+redirect and redirects never loop.
 
 ## Queries
 
