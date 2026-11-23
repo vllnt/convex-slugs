@@ -229,3 +229,66 @@ describe("slugs component — argument validation", () => {
     ).rejects.toMatchObject(invalid);
   });
 });
+
+describe("slugs component — size limits", () => {
+  const invalid = { data: { code: "INVALID_ARGUMENT" } };
+  const wide = { minLength: 1, maxLength: 1_000_000 };
+
+  test("slugs over 1024 characters are invalid even with wider bounds", async () => {
+    const t = setup();
+    expect(
+      await t.mutation(api.mutations.reserve, {
+        scope,
+        slug: "s".repeat(1025),
+        resourceRef: "r",
+        bounds: wide,
+      }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+    expect(
+      await t.mutation(api.mutations.reserve, {
+        scope,
+        slug: "s".repeat(1024),
+        resourceRef: "r",
+        bounds: wide,
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      await t.mutation(api.mutations.rename, {
+        scope,
+        fromSlug: "s".repeat(1024),
+        toSlug: "t".repeat(1025),
+        bounds: wide,
+      }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+  });
+
+  test("writes reject scopes and resourceRefs over 1024 characters; release does not", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.mutations.reserve, {
+        scope: "x".repeat(1025),
+        slug: "s",
+        resourceRef: "r",
+        bounds,
+      }),
+    ).rejects.toMatchObject(invalid);
+    await expect(reserve(t, "s", "r".repeat(1025))).rejects.toMatchObject(invalid);
+    await expect(
+      t.mutation(api.mutations.rename, {
+        scope: "x".repeat(1025),
+        fromSlug: "a",
+        toSlug: "b",
+        bounds,
+      }),
+    ).rejects.toMatchObject(invalid);
+    await t.mutation(internal.mutations.insertRaw, {
+      scope: "x".repeat(1025),
+      slug: "legacy",
+      resourceRef: "r",
+    });
+    await t.mutation(api.mutations.release, { scope: "x".repeat(1025), slug: "legacy" });
+    expect(
+      await t.query(api.queries.resolve, { scope: "x".repeat(1025), slug: "legacy" }),
+    ).toBeNull();
+  });
+});

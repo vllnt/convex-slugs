@@ -39,7 +39,7 @@ validation, authorization in host wrappers, and runtime failures can throw.
 
 | Reason           | When                                                                    |
 | ---------------- | ----------------------------------------------------------------------- |
-| `SLUG_INVALID`   | Empty/whitespace, outside `minLength`..`maxLength`, or fails `pattern`. |
+| `SLUG_INVALID`   | Empty/whitespace, outside `minLength`..`maxLength`, longer than 1024 characters (hard cap), or fails `pattern`. |
 | `SLUG_RESERVED`  | The normalized slug is in `reservedWords`.                              |
 | `SLUG_TAKEN`     | The slug is already held in the scope.                                  |
 | `SLUG_NOT_FOUND` | `rename` was called for a `fromSlug` that is not held.                  |
@@ -55,7 +55,7 @@ Malformed input throws a `ConvexError` whose `data.code` is stable:
 | Code               | Thrown by           | When                                                                                              |
 | ------------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
 | `INVALID_OPTIONS`  | `new Slugs(...)`    | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `0 <= minLength <= maxLength`. |
-| `INVALID_ARGUMENT` | component mutations | Empty `scope` or `resourceRef`, or `bounds` that are not integers with `minLength <= maxLength`.  |
+| `INVALID_ARGUMENT` | component mutations | Empty `scope` or `resourceRef`, a `scope` or `resourceRef` over 1024 characters on `reserve`/`rename`, or `bounds` that are not integers with `minLength <= maxLength`.  |
 
 ## Concurrency
 

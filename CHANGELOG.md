@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The component caps write input size independently of caller-supplied `bounds`: slugs over
+  1024 characters return `SLUG_INVALID`, and a `scope` or `resourceRef` over 1024 characters on
+  `reserve` / `rename` throws `INVALID_ARGUMENT`. `release` stays unvalidated for size so any
+  stored row can be removed.
+
 ## [0.1.1] - Unreleased
 
 ### Fixed

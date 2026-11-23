@@ -2,6 +2,8 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server.js";
 import { lengthBounds, reserveResult } from "./validators.js";
 
+const MAX_KEY_LENGTH = 1024;
+
 /**
  * Reject malformed arguments with `ConvexError({ code: "INVALID_ARGUMENT" })`.
  * Expected slug rejections stay typed `{ ok: false, reason }` results; this
@@ -20,10 +22,13 @@ function assertArgs(args: {
       Number.isInteger(bounds.maxLength) &&
       bounds.minLength <= bounds.maxLength
     );
-  if (scope === "" || resourceRef === "" || badBounds) {
+  const oversized =
+    bounds !== undefined &&
+    (scope.length > MAX_KEY_LENGTH || (resourceRef ?? "").length > MAX_KEY_LENGTH);
+  if (scope === "" || resourceRef === "" || badBounds || oversized) {
     throw new ConvexError({
       code: "INVALID_ARGUMENT",
-      message: "scope and resourceRef must be non-empty; bounds must be integers with min <= max",
+      message: `scope and resourceRef must be non-empty and at most ${String(MAX_KEY_LENGTH)} characters; bounds must be integers with min <= max`,
     });
   }
 }
@@ -50,7 +55,7 @@ export const reserve = mutation({
     if (args.slug.length < Math.max(1, args.bounds.minLength)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
-    if (args.slug.length > args.bounds.maxLength) {
+    if (args.slug.length > Math.min(args.bounds.maxLength, MAX_KEY_LENGTH)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
     const existing = await ctx.db
@@ -149,7 +154,7 @@ export const rename = mutation({
     if (args.toSlug.length < Math.max(1, args.bounds.minLength)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
-    if (args.toSlug.length > args.bounds.maxLength) {
+    if (args.toSlug.length > Math.min(args.bounds.maxLength, MAX_KEY_LENGTH)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
     const from = await ctx.db
