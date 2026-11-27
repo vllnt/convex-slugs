@@ -52,8 +52,9 @@ src/
 
 ## Key design decisions
 
-- **Unique-per-`(scope, slug)` registry.** The `slugs` table has a unique index on `(scope, slug)`;
-  Convex's transactional mutations prevent double-reserve without application-level locking.
+- **Unique-per-`(scope, slug)` registry.** The `slugs` table has an index on `(scope, slug)`
+  (Convex indexes are not unique constraints); Convex's transactional mutations prevent
+  double-reserve without application-level locking.
 - **Rename records a redirect and collapses chains.** `rename(A→B)` then `rename(B→C)` rewrites the
   A→B redirect to A→C so `redirectFor(A)` always returns the live slug in one row — no
   multi-hop traversal, at most one redirect row per `(scope, fromSlug)`.

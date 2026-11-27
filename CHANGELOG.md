@@ -19,14 +19,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `bundler` resolution (`vite/client` reference, `.js` suffixes on relative
   imports).
 - Test files are no longer included in the published package.
+- `register` from `@vllnt/convex-slugs/test` accepts a `convex-test` instance
+  built from the host app's schema, as the README shows; it used to require the
+  component's own schema type.
 
 ### Added
 
 - Invalid input is rejected with a `ConvexError`: `INVALID_OPTIONS` from
   `new Slugs(...)` (empty `defaultScope`, `minLength`/`maxLength` that are not
-  integers, or inverted), and `INVALID_ARGUMENT` from component mutations (empty
-  `scope`/`resourceRef`, invalid `bounds`). A `NaN` `maxLength` used to disable
-  the length cap.
+  integers or inverted, a negative `minLength`, or `maxLength < 1`), and
+  `INVALID_ARGUMENT` from component mutations (empty `scope`/`resourceRef`,
+  invalid `bounds`). A `NaN` `maxLength` used to disable the length cap.
+- The npm package ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so the
+  docs in `node_modules/@vllnt/convex-slugs/` match the installed version.
+  `llms.txt` links to the shipped files with relative paths. `docs/API.md` now
+  lists every entry point, the React hooks and the `register` test helper.
 
 ### Changed
 
@@ -35,6 +42,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Release flow: npm trusted publishing with provenance; `@latest` only from a
   `vX.Y.Z` tag on `main`. Pinned CI actions, pnpm 10 with a release-age gate,
   low-memory dev defaults.
+- Release flow: every push to `main` that changes the package or its shipped
+  docs publishes a `canary`; `pnpm test:package` in CI fails when a required
+  file is missing from the packed tarball.
+- `package.json` `homepage` points to
+  https://oss.vllnt.com/packages/convex-slugs.
 
 ## [0.1.0] - 2026-09-01
 

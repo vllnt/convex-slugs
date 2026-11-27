@@ -49,6 +49,12 @@ command installs the stable release. Prereleases are published under the
 `canary` tag (`@vllnt/convex-slugs@canary`); pin a resolved canary version for
 reproducible installs.
 
+### For coding agents
+
+The docs are bundled in the package at `node_modules/@vllnt/convex-slugs/docs/`,
+next to `llms.txt`, `CHANGELOG.md`, `src/` and `dist/`. They match the installed
+version. Read them before writing code against this package.
+
 ## Usage
 
 ```ts
@@ -171,20 +177,29 @@ const t = convexTest(schema, import.meta.glob("./**/*.ts"));
 register(t);
 ```
 
+## Related packages
+
+- [`@vllnt/convex-tokens`](https://www.npmjs.com/package/@vllnt/convex-tokens) —
+  use it when the key must stay secret (share links, magic links): tokens are
+  hashed, expire and can be revoked. A slug is a public, readable name that
+  anyone can resolve.
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See
+[CONTRIBUTING.md](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md).
 
 ## Author
 
 Built by [bntvllnt](https://github.com/bntvllnt) ·
 [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
 
-Part of the [@vllnt](https://github.com/vllnt) Convex component fleet —
-[vllnt.com](https://vllnt.com)
-
 If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+Part of vllnt oss: https://oss.vllnt.com

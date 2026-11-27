@@ -2,6 +2,22 @@
 
 **Compatibility:** `convex@^1.45.0`; optional `react@>=18` for `./react`.
 
+## Entry points
+
+| Import                                     | Exports                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------ |
+| `@vllnt/convex-slugs`                      | `Slugs` class; types `SlugsComponent`, `SlugsOptions`, `SlugWriteResult` |
+| `@vllnt/convex-slugs/convex.config`        | Component definition (default export) for `app.use(...)`                 |
+| `@vllnt/convex-slugs/react`                | `useSlugAvailable`, `useResolve` (see [React hooks](#react-hooks))       |
+| `@vllnt/convex-slugs/test`                 | `register(t, name?)` (see [Testing helper](#testing-helper))             |
+| `@vllnt/convex-slugs/_generated/component` | Type `ComponentApi` of the mounted component                             |
+
+`SlugWriteResult` is
+`{ ok: boolean; reason?: "SLUG_TAKEN" | "SLUG_NOT_FOUND" | "SLUG_INVALID" | "SLUG_RESERVED" }`.
+`./convex.config.js` and `./_generated/component.js` are `.js`-suffixed aliases
+of the same entry points. `SlugsComponent` is the shape of `components.slugs`
+that `new Slugs(...)` accepts.
+
 Construct the client with the mounted component and optional config:
 
 ```ts
@@ -52,10 +68,10 @@ caller bypasses the client.
 
 Malformed input throws a `ConvexError` whose `data.code` is stable:
 
-| Code               | Thrown by           | When                                                                                              |
-| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
-| `INVALID_OPTIONS`  | `new Slugs(...)`    | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `0 <= minLength <= maxLength`. |
-| `INVALID_ARGUMENT` | component mutations | Empty `scope` or `resourceRef`, or `bounds` that are not integers with `minLength <= maxLength`.  |
+| Code               | Thrown by           | When                                                                                                                   |
+| ------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`  | `new Slugs(...)`    | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `0 <= minLength <= maxLength` and `maxLength >= 1`. |
+| `INVALID_ARGUMENT` | component mutations | Empty `scope` or `resourceRef`, or `bounds` that are not integers with `minLength <= maxLength`.                       |
 
 ## Concurrency
 
@@ -107,3 +123,29 @@ otherwise `null`.
 
 The slug currently held by `resourceRef`, or `null`. Assumes one slug per
 `(scope, resourceRef)` (the host reserves at most one).
+
+## React hooks
+
+`@vllnt/convex-slugs/react` wraps `useQuery` from `convex/react`. Each hook
+takes the host's own public query that forwards `{ slug, scope? }` to
+`slugs.resolve` and returns `string | null`; the component's internal queries
+cannot be called from a browser.
+
+### `useSlugAvailable(resolveRef, { slug, scope? }) → { available, resourceRef }`
+
+`available` is `undefined` while loading, `true` when the slug is free, and
+`false` when held. `resourceRef` is the holder, or `null` when free or loading.
+Availability is a lookup hint: it does not check length, `pattern` or reserved
+words, and a concurrent claim can still win, so always check `reserve`'s result.
+
+### `useResolve(resolveRef, { slug, scope? }) → resourceRef | null | undefined`
+
+The holding `resourceRef`, `null` when free, or `undefined` while loading.
+
+## Testing helper
+
+### `register(t, name = "slugs") → void`
+
+From `@vllnt/convex-slugs/test`. Mounts the component in a `convex-test`
+instance under `name`. The helper ships as TypeScript source and uses Vite's
+`import.meta.glob`, so the consuming tests need `convex-test` and `vitest`.
