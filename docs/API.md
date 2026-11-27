@@ -14,8 +14,9 @@
 
 `SlugWriteResult` is
 `{ ok: boolean; reason?: "SLUG_TAKEN" | "SLUG_NOT_FOUND" | "SLUG_INVALID" | "SLUG_RESERVED" }`.
-`SlugsComponent` is the shape of `components.slugs` that `new Slugs(...)`
-accepts.
+`./convex.config.js` and `./_generated/component.js` are `.js`-suffixed aliases
+of the same entry points. `SlugsComponent` is the shape of `components.slugs`
+that `new Slugs(...)` accepts.
 
 Construct the client with the mounted component and optional config:
 

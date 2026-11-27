@@ -27,9 +27,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Invalid input is rejected with a `ConvexError`: `INVALID_OPTIONS` from
   `new Slugs(...)` (empty `defaultScope`, `minLength`/`maxLength` that are not
-  integers, or inverted), and `INVALID_ARGUMENT` from component mutations (empty
-  `scope`/`resourceRef`, invalid `bounds`). A `NaN` `maxLength` used to disable
-  the length cap.
+  integers or inverted, a negative `minLength`, or `maxLength < 1`), and
+  `INVALID_ARGUMENT` from component mutations (empty `scope`/`resourceRef`,
+  invalid `bounds`). A `NaN` `maxLength` used to disable the length cap.
 - The npm package ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so the
   docs in `node_modules/@vllnt/convex-slugs/` match the installed version.
   `llms.txt` links to the shipped files with relative paths. `docs/API.md` now

@@ -186,7 +186,8 @@ register(t);
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See
+[CONTRIBUTING.md](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md).
 
 ## Author
 

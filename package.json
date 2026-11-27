@@ -112,8 +112,7 @@
     "slug",
     "handle",
     "username",
-    "redirect",
-    "unique"
+    "redirect"
   ],
   "peerDependenciesMeta": {
     "react": {

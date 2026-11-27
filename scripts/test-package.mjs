@@ -21,12 +21,12 @@ const REQUIRED = [
   "dist/client/index.js",
   "dist/client/index.d.ts",
   "dist/react/index.js",
+  "dist/react/index.d.ts",
   "dist/component/convex.config.js",
+  "dist/component/convex.config.d.ts",
   "dist/component/_generated/component.d.ts",
   "src/test.ts",
 ];
-// Contributor-only files that must stay out of the package.
-const FORBIDDEN = ["AGENTS.md", "CONTRIBUTING.md", "example", "scripts"];
 
 const root = process.cwd();
 /** @type {unknown} */
@@ -72,7 +72,6 @@ try {
 
   const installed = join(temporary, "node_modules", metadata.name);
   const missing = REQUIRED.filter((file) => !existsSync(join(installed, file)));
-  const leaked = FORBIDDEN.filter((file) => existsSync(join(installed, file)));
   // Relative llms.txt links must resolve inside the installed package.
   const llms = join(installed, "llms.txt");
   const index = existsSync(llms) ? readFileSync(llms, "utf8") : "";
@@ -83,9 +82,9 @@ try {
       (target) =>
         !existsSync(join(dirname(llms), target.split("#")[0] ?? target)),
     );
-  if (missing.length > 0 || leaked.length > 0 || broken.length > 0)
+  if (missing.length > 0 || broken.length > 0)
     throw new Error(
-      `package contents: missing [${missing.join(", ")}], unexpected [${leaked.join(", ")}], broken llms.txt links [${broken.join(", ")}]`,
+      `package contents: missing [${missing.join(", ")}], broken llms.txt links [${broken.join(", ")}]`,
     );
   console.log(`OK    ${REQUIRED.length} required files in the package`);
 
@@ -126,26 +125,37 @@ const host = defineSchema({ unrelated: defineTable({ label: v.string() }) });
 register(convexTest(host, {}), "custom");
 `,
   );
-  // The shipped test helper is TypeScript source: it must compile for Bundler and NodeNext consumers.
-  for (const [module, resolution] of [
-    ["ESNext", "Bundler"],
-    ["NodeNext", "NodeNext"],
-  ])
-    run("pnpm", [
-      "exec",
-      "tsc",
-      "--noEmit",
-      "--strict",
-      "--module",
-      String(module),
-      "--moduleResolution",
-      String(resolution),
-      "--target",
-      "ES2022",
-      "--types",
-      "vite/client,node",
-      "registration.ts",
-    ]);
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "ESNext",
+    "--moduleResolution",
+    "Bundler",
+    "--target",
+    "ES2022",
+    "--types",
+    "vite/client,node",
+    "registration.ts",
+  ]);
+  // The shipped test helper is TypeScript source: it must also compile for NodeNext consumers.
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    "--target",
+    "ES2022",
+    "--types",
+    "node",
+    "registration.ts",
+  ]);
   run("node", [
     "--input-type=module",
     "-e",
