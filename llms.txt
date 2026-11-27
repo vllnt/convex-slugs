@@ -5,21 +5,27 @@
 `@vllnt/convex-slugs` is a publishable Convex component. It targets `convex@^1.45.0`.
 It stores two sandboxed tables - `slugs` (unique per `(scope, slug)`, mapping to an opaque `resourceRef`) and `redirects` (old to new on rename). Uniqueness rides the Convex mutation transaction. The host owns the resource, auth, and meaning; the component owns only the uniqueness + redirect state. Slugs are case-folded by default.
 
+For coding agents: the docs are bundled in the package at `node_modules/@vllnt/convex-slugs/docs/` and match the installed version. Read them before writing code. The `src/` and `dist/` folders next to them hold the source and type declarations of the same version.
+
 ## Docs
 
-- [README](README.md): Project overview, installation, usage examples, architecture
-- [API Reference](docs/API.md): Public class methods, return shapes, input validation
-- [Changelog](CHANGELOG.md): Version history and release notes
-- [Contributing](CONTRIBUTING.md): Development setup, validation commands, release workflow
+- [README](./README.md): Project overview, installation, usage examples, architecture
+- [API Reference](./docs/API.md): Public exports, class methods, return shapes, input validation
+- [Changelog](./CHANGELOG.md): Version history and release notes
+- [Contributing](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md): Development setup, validation commands, release workflow
 
 ## Examples
 
-- [Example component wrapper](example/convex/example.ts): Host-app wrapper functions
-- [Example tests](example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
+- [Example component wrapper](https://github.com/vllnt/convex-slugs/blob/main/example/convex/example.ts): Host-app wrapper functions
+- [Example tests](https://github.com/vllnt/convex-slugs/blob/main/example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
+
+## Ecosystem
+
+- [vllnt oss](https://oss.vllnt.com/llms.txt): Index of vllnt open-source packages
 
 ## Optional
 
-- [AGENTS](AGENTS.md): Canonical agent instructions for this repository
-- [Security Policy](SECURITY.md): Vulnerability reporting policy
-- [Code of Conduct](CODE_OF_CONDUCT.md): Community participation guidelines
-- [License](LICENSE): MIT license
+- [AGENTS](https://github.com/vllnt/convex-slugs/blob/main/AGENTS.md): Agent instructions for contributors to this repository
+- [Security Policy](https://github.com/vllnt/convex-slugs/blob/main/SECURITY.md): Vulnerability reporting policy
+- [Code of Conduct](https://github.com/vllnt/convex-slugs/blob/main/CODE_OF_CONDUCT.md): Community participation guidelines
+- [License](./LICENSE): MIT license
