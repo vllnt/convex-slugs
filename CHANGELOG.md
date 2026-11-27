@@ -19,6 +19,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `bundler` resolution (`vite/client` reference, `.js` suffixes on relative
   imports).
 - Test files are no longer included in the published package.
+- `register` from `@vllnt/convex-slugs/test` accepts a `convex-test` instance
+  built from the host app's schema, as the README shows; it used to require the
+  component's own schema type.
 
 ### Added
 
