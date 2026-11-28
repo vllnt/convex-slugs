@@ -35,6 +35,23 @@ describe("Slugs client options", () => {
     }
   });
 
+  test("length bounds are checked on the client before any mutation call", async () => {
+    const c = ctx();
+    const slugs = new Slugs(component, { minLength: 3, maxLength: 4 });
+    expect(await slugs.reserve(c, "abcde", "r")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await slugs.rename(c, "abc", "ab")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(c.runMutation).not.toHaveBeenCalled();
+    expect(await slugs.reserve(c, "abcd", "r")).toEqual({ ok: true });
+    expect(await slugs.reserve(c, "abc", "r")).toEqual({ ok: true });
+    expect(c.runMutation).toHaveBeenCalledTimes(2);
+  });
+
   test.each([
     { minLength: Number.NaN },
     { maxLength: Number.NaN },

@@ -50,9 +50,9 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
 - Release flow: npm trusted publishing with provenance; `@latest` only from a
   `vX.Y.Z` tag on `main`. Pinned CI actions, pnpm 10 with a release-age gate,
   low-memory dev defaults.
-- Release flow: every push to `main` that changes the package or its shipped
-  docs publishes a `canary`; `pnpm test:package` in CI fails when a required
-  file is missing from the packed tarball.
+- Release flow: every push to `main` publishes a `canary`, so the newest canary
+  is always built from the head of `main`; `pnpm test:package` in CI fails when
+  a required file is missing from the packed tarball.
 - `package.json` `homepage` points to
   https://oss.vllnt.com/packages/convex-slugs.
 - Docs: README "Related packages" lists only packages this one works with in
@@ -76,11 +76,19 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
   and React hooks."; `keywords` now list 11 search terms.
 - Release flow: the 7-day release-age gate moved from the `package.json` `pnpm`
   field, which pnpm 10 ignores, to `pnpm-workspace.yaml`, so installs refuse
-  versions newer than 7 days (`@vllnt/*` excluded). Renovate waits 7 days too.
+  versions newer than 7 days (`@vllnt/*` excluded).
 - Release flow: `pnpm test:package` copies that release-age gate into its temp
   consumer install.
 - CI: the Lint job runs `scripts/test-check-package-contents.sh`, which now also
   checks that `.test.mts` and `.test.cts` files are kept out of the tarball.
+- Internal: CI and publish set up pnpm through Corepack from the `packageManager`
+  field instead of `pnpm/action-setup`, and the privacy guard pins
+  `actions/checkout` and `actions/setup-node` to commits; `pnpm test:package`
+  runs that same pnpm in its temp project and fails on any other version; there
+  is no version-update bot (`renovate.json` is gone), so dependency updates are
+  a manual pass under the 7-day rule; the React hook tests render through
+  `react-dom/server`, which drops `@testing-library/react` and `jsdom` from the
+  dev dependencies; a client test now covers the length bounds.
 
 ## [0.1.0] - 2026-09-01
 
