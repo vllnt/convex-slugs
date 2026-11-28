@@ -228,4 +228,34 @@ describe("slugs component — argument validation", () => {
       }),
     ).rejects.toMatchObject(invalid);
   });
+
+  test("a 0.1.0 row under scope '' can be read but not released or renamed", async () => {
+    const t = setup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("slugs", { scope: "", slug: "old", resourceRef: "r" });
+    });
+    expect(await t.query(api.queries.resolve, { scope: "", slug: "old" })).toBe(
+      "r",
+    );
+    expect(
+      await t.query(api.queries.slugForResource, { scope: "", resourceRef: "r" }),
+    ).toBe("old");
+    expect(
+      await t.query(api.queries.redirectFor, { scope: "", slug: "old" }),
+    ).toBeNull();
+    await expect(
+      t.mutation(api.mutations.release, { scope: "", slug: "old" }),
+    ).rejects.toMatchObject(invalid);
+    await expect(
+      t.mutation(api.mutations.rename, {
+        scope: "",
+        fromSlug: "old",
+        toSlug: "new",
+        bounds,
+      }),
+    ).rejects.toMatchObject(invalid);
+    expect(await t.query(api.queries.resolve, { scope: "", slug: "old" })).toBe(
+      "r",
+    );
+  });
 });

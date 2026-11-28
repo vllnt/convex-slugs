@@ -61,6 +61,19 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
 - Release flow: canary and stable publishes run `pnpm test:package` first; it
   type-checks every entry point and imports every runtime entry point,
   including `./react` with React 18.
+- Docs: README rewritten in the shared @vllnt section order (When to use, Quick
+  start, API table, Common tasks, Errors and fixes, Limits and gotchas,
+  Compatibility, Links); `docs/API.md` has one heading per export and method;
+  `llms.txt` has When to use, an errors link and the Ecosystem block last;
+  TSDoc on every public export.
+- Docs contract test: `pnpm lint` checks the README, `docs/API.md`, `llms.txt`
+  and `CHANGELOG.md` in the repository, and `pnpm test:package` checks them in
+  the installed tarball, checks every export against the built types and
+  type-checks and runs the README examples. `pnpm check:links` requests every
+  external docs link.
+- `package.json` `description` is now "Convex component for unique slugs,
+  handles and usernames per scope, with rename redirects, a TypeScript client
+  and React hooks."; `keywords` now list 11 search terms.
 
 ## [0.1.0] - 2026-09-01
 

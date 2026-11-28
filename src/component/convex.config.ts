@@ -1,5 +1,6 @@
 import { defineComponent } from "convex/server";
 
+/** Component definition, named `slugs`. Mount it with `app.use(config)` in `convex/convex.config.ts`. */
 const component = defineComponent("slugs");
 
 // Nest official child components here, e.g.:
