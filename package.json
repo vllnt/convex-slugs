@@ -132,10 +132,6 @@
       "deepmerge-ts@<8.0.0": "^8.0.0",
       "handlebars@<4.7.10": "^4.7.10"
     },
-    "minimumReleaseAge": 10080,
-    "minimumReleaseAgeExclude": [
-      "@vllnt/*"
-    ],
     "ignoredBuiltDependencies": [
       "esbuild"
     ]
