@@ -46,7 +46,14 @@ if (
   typeof metadata.version !== "string"
 )
   throw new Error("invalid package metadata");
-const tarball = `${metadata.name.replace("@", "").replace("/", "-")}-${metadata.version}.tgz`;
+// The root minimumReleaseAge and minimumReleaseAgeExclude blocks, copied verbatim.
+const releaseAgeBlocks = readFileSync("pnpm-workspace.yaml", "utf8").match(
+  /^minimumReleaseAge(?:Exclude)?:.*\n?(?:[\t ]+.*\n?)*/gm,
+);
+if (!releaseAgeBlocks?.some((block) => block.startsWith("minimumReleaseAge:")))
+  throw new Error("pnpm-workspace.yaml: minimumReleaseAge is missing");
+const releaseAge = releaseAgeBlocks.join("");
+const tarball =`${metadata.name.replace("@", "").replace("/", "-")}-${metadata.version}.tgz`;
 const temporary = mkdtempSync(join(tmpdir(), "slugs-consumer-"));
 /** @param {string} command @param {string[]} arguments_ @param {string} [cwd] */
 const run = (command, arguments_, cwd = temporary) =>
@@ -62,9 +69,11 @@ try {
     }),
   );
   // pnpm 11 reads the build-script policy from the workspace file, pnpm 10 from package.json.
+  // No lockfile here, and the temp project sits outside the repo: copy the root release-age
+  // rule so floating transitive deps follow the same 7-day gate.
   writeFileSync(
     join(temporary, "pnpm-workspace.yaml"),
-    "allowBuilds:\n  esbuild: false\n",
+    `allowBuilds:\n  esbuild: false\n${releaseAge}`,
   );
   run("pnpm", [
     "add",

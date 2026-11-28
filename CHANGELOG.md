@@ -77,6 +77,8 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
 - Release flow: the 7-day release-age gate moved from the `package.json` `pnpm`
   field, which pnpm 10 ignores, to `pnpm-workspace.yaml`, so installs refuse
   versions newer than 7 days (`@vllnt/*` excluded). Renovate waits 7 days too.
+- Release flow: `pnpm test:package` copies that release-age gate into its temp
+  consumer install.
 - CI: the Lint job runs `scripts/test-check-package-contents.sh`, which now also
   checks that `.test.mts` and `.test.cts` files are kept out of the tarball.
 
