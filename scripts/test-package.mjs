@@ -42,8 +42,10 @@ if (
   metadata === null ||
   !("name" in metadata) ||
   !("version" in metadata) ||
+  !("packageManager" in metadata) ||
   typeof metadata.name !== "string" ||
-  typeof metadata.version !== "string"
+  typeof metadata.version !== "string" ||
+  typeof metadata.packageManager !== "string"
 )
   throw new Error("invalid package metadata");
 // The root minimumReleaseAge and minimumReleaseAgeExclude blocks, copied verbatim.
@@ -63,11 +65,22 @@ try {
   writeFileSync(
     join(temporary, "package.json"),
     JSON.stringify({
+      // Corepack then runs the repo's pnpm here too, not the newest release.
+      packageManager: metadata.packageManager,
       pnpm: { ignoredBuiltDependencies: ["esbuild"] },
       private: true,
       type: "module",
     }),
   );
+  const pnpmVersion = execFileSync("pnpm", ["--version"], {
+    cwd: temporary,
+    encoding: "utf8",
+  }).trim();
+  if (`pnpm@${pnpmVersion}` !== metadata.packageManager.split("+")[0])
+    throw new Error(
+      `temp project runs pnpm ${pnpmVersion}, not ${metadata.packageManager}`,
+    );
+  console.log(`OK    temp project runs pnpm ${pnpmVersion}`);
   // pnpm 11 reads the build-script policy from the workspace file, pnpm 10 from package.json.
   // No lockfile here, and the temp project sits outside the repo: copy the root release-age
   // rule so floating transitive deps follow the same 7-day gate.
