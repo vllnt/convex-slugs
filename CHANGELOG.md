@@ -4,102 +4,83 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-11-28
 
 ### Breaking
 
-Inputs that 0.1.0 accepted now throw a `ConvexError`:
+Input that 0.1.0 accepted is now rejected. What to do:
 
-- `INVALID_OPTIONS` from `new Slugs(...)`: an empty `defaultScope`, a
-  `minLength` or `maxLength` that is not an integer (for example `1.5` or
-  `NaN`), a negative `minLength`, `minLength > maxLength`, or `maxLength < 1`.
-  A `NaN` `maxLength` used to disable the length cap.
-- `INVALID_ARGUMENT` from the component mutations `reserve`, `release` and
-  `rename`: an empty `scope`, an empty `resourceRef` (`reserve`), or `bounds`
-  that are not integers or have `minLength > maxLength`. Rows that 0.1.0 stored
-  under scope `""` can no longer be released or renamed.
-- **Breaking:** `reserve` and `rename` cap what they write at 1024 UTF-16 code
-  units (`string.length`), whatever `maxLength` or `bounds` say: a longer slug
-  or `toSlug` returns `SLUG_INVALID`, and a longer `scope` (`reserve`,
-  `rename`) or `resourceRef` (`reserve`) throws `INVALID_ARGUMENT`. Shorten such
-  values; `new Slugs` still accepts a `maxLength` over 1024, but the component
-  rejects the longer slugs. Rows stored over the cap before 0.2.0 stay readable,
-  and `release` still removes them. Updating such a row: `rename` from an
-  over-cap slug to a shorter one works; `reserve` or `rename` onto an over-cap
-  slug returns `SLUG_INVALID` and leaves the row; `reserve` and `rename` in an
-  over-cap scope throw `INVALID_ARGUMENT`; a row with an over-cap `resourceRef`
-  keeps it when renamed.
+- `new Slugs(...)` throws a `ConvexError` with code `INVALID_OPTIONS` for an
+  empty `defaultScope`, a `minLength` or `maxLength` that is not an integer
+  (for example `1.5` or `NaN`), a negative `minLength`, `minLength > maxLength`,
+  or `maxLength < 1`. A `NaN` `maxLength` used to disable the length cap. Fix
+  the options.
+- The component mutations `reserve`, `release` and `rename` throw a
+  `ConvexError` with code `INVALID_ARGUMENT` for an empty `scope`, an empty
+  `resourceRef` (`reserve`), or `bounds` that are not integers or have
+  `minLength > maxLength`. Rows that 0.1.0 stored under scope `""` can no longer
+  be released or renamed. Pass a non-empty `scope` (or omit it for
+  `defaultScope`) and a non-empty `resourceRef`.
+- `reserve` and `rename` cap what they write at 1024 UTF-16 code units
+  (`string.length`), whatever `maxLength` or `bounds` say. A longer slug or
+  `toSlug` returns `{ ok: false, reason: "SLUG_INVALID" }`; a longer `scope`
+  (`reserve`, `rename`) or `resourceRef` (`reserve`) throws `INVALID_ARGUMENT`.
+  Shorten such values; `new Slugs` still accepts a `maxLength` over 1024, but
+  the component rejects the longer slugs. Rows stored over the cap before 0.2.0
+  stay readable, and `release` still removes them. Updating such a row: `rename`
+  from an over-cap slug to a shorter one works; `reserve` or `rename` onto an
+  over-cap slug returns `SLUG_INVALID` and leaves the row; `reserve` and
+  `rename` in an over-cap scope throw `INVALID_ARGUMENT`; a row with an over-cap
+  `resourceRef` keeps it when renamed.
+- Reserved words are normalized like slugs, so `reservedWords: ["Admin"]` now
+  blocks `admin` with `SLUG_RESERVED` (0.1.0 never matched it while `foldCase`
+  was on). Remove a word from `reservedWords` if it must stay claimable.
 
 ### Fixed
 
 - `rename` no longer leaves a self-redirect when a slug is renamed back to an
   earlier name (A→B, then B→A left `redirectFor(A) === A` on a live slug). A
   redirect starting at the new live name is now removed.
-- Reserved words are normalized like slugs, so `reservedWords: ["Admin"]` blocks
-  `admin` (previously never matched when `foldCase` was on).
 - A `pattern` with the `g` or `y` flag gives the same verdict on every call
   instead of alternating.
 - `@vllnt/convex-slugs/test` type-checks for consumers under `nodenext` and
   `bundler` resolution (`vite/client` reference, `.js` suffixes on relative
   imports).
-- Test files are no longer included in the published package.
 - `register` from `@vllnt/convex-slugs/test` accepts a `convex-test` instance
   built from the host app's schema, as the README shows; it used to require the
   component's own schema type.
+- Test files are no longer included in the published package.
 
 ### Added
 
 - The npm package ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so the
   docs in `node_modules/@vllnt/convex-slugs/` match the installed version.
-  `llms.txt` links to the shipped files with relative paths. `docs/API.md` now
-  lists every entry point, the React hooks and the `register` test helper.
+  `llms.txt` links to the shipped files with relative paths. `docs/API.md` lists
+  every entry point, the React hooks and the `register` test helper.
 
 ### Changed
 
-- Docs: README install command targets the stable release, "Testing your app",
-  error table, concurrency and normalization limits.
-- Release flow: npm trusted publishing with provenance; `@latest` only from a
-  `vX.Y.Z` tag on `main`. Pinned CI actions, pnpm 10 with a release-age gate,
-  low-memory dev defaults.
-- Release flow: every push to `main` publishes a `canary`, so the newest canary
-  is always built from the head of `main`; `pnpm test:package` in CI fails when
-  a required file is missing from the packed tarball.
-- `package.json` `homepage` points to
-  https://oss.vllnt.com/packages/convex-slugs.
-- Docs: README "Related packages" lists only packages this one works with in
-  code, which is none; the hint to use `@vllnt/convex-tokens` for secret keys
-  moved to the intro.
-- Release flow: canary and stable publishes run `pnpm test:package` first; it
-  type-checks every entry point and imports every runtime entry point,
-  including `./react` with React 18.
+- `engines.node` is now `>=20` (was `>=18`): the lowest supported `convex`,
+  1.45, needs Node.js 20. Use Node.js 20 or later. The peer range stays
+  `convex@^1.45.0`.
+- Releases are published from CI with npm provenance. `@latest` comes only from
+  a `vX.Y.Z` tag on `main`, and every push to `main` publishes a `canary` built
+  from that commit.
 - Docs: README rewritten in the shared @vllnt section order (When to use, Quick
   start, API table, Common tasks, Errors and fixes, Limits and gotchas,
-  Compatibility, Links); `docs/API.md` has one heading per export and method;
-  `llms.txt` has When to use, an errors link and the Ecosystem block last;
-  TSDoc on every public export.
-- Docs contract test: `pnpm lint` checks the README, `docs/API.md`, `llms.txt`
-  and `CHANGELOG.md` in the repository, and `pnpm test:package` checks them in
-  the installed tarball, checks every export against the built types and
-  type-checks and runs the README examples. `pnpm check:links` requests every
-  external docs link.
-- `package.json` `description` is now "Convex component for unique slugs,
+  Compatibility, Testing, Security, Links), with the install command for the
+  stable release, every reason and error code, and the concurrency and
+  normalization limits; "Related packages" lists none, and the hint to use
+  `@vllnt/convex-tokens` for secret keys is in the intro. `docs/API.md` has one
+  heading per export and method; `llms.txt` has When to use, an errors link
+  and the Ecosystem block last; TSDoc on every public export.
+- `package.json`: `description` is now "Convex component for unique slugs,
   handles and usernames per scope, with rename redirects, a TypeScript client
-  and React hooks."; `keywords` now list 11 search terms.
-- Release flow: the 7-day release-age gate moved from the `package.json` `pnpm`
-  field, which pnpm 10 ignores, to `pnpm-workspace.yaml`, so installs refuse
-  versions newer than 7 days (`@vllnt/*` excluded).
-- Release flow: `pnpm test:package` copies that release-age gate into its temp
-  consumer install.
-- CI: the Lint job runs `scripts/test-check-package-contents.sh`, which now also
-  checks that `.test.mts` and `.test.cts` files are kept out of the tarball.
-- Internal: CI and publish set up pnpm through Corepack from the `packageManager`
-  field instead of `pnpm/action-setup`, and the privacy guard pins
-  `actions/checkout` and `actions/setup-node` to commits; `pnpm test:package`
-  runs that same pnpm in its temp project and fails on any other version; there
-  is no version-update bot (`renovate.json` is gone), so dependency updates are
-  a manual pass under the 7-day rule; the React hook tests render through
-  `react-dom/server`, which drops `@testing-library/react` and `jsdom` from the
-  dev dependencies; a client test now covers the length bounds.
+  and React hooks.", `keywords` list 11 search terms, and `homepage` points to
+  https://oss.vllnt.com/packages/convex-slugs.
+- Internal: CI, release and docs checks (packed-package test against convex
+  1.45.0 and React 18, tarball contents, docs contract), a 7-day release-age
+  gate, pnpm 10 through Corepack, no version-update bot, and more tests.
 
 ## [0.1.0] - 2026-09-01
 

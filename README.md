@@ -277,8 +277,8 @@ the component runs.
 - Peer dependency: `convex@^1.45.0`. CI runs the unit tests on the locked convex
   version (1.51.0), and type-checks and runs the packed package against convex
   1.45.0.
-- Node.js: convex 1.45 to 1.48 require Node.js 20 or later; convex 1.49 and
-  newer require Node.js 22 or later. ES modules only.
+- Node.js: `engines.node` is `>=20`. convex 1.45 to 1.48 require Node.js 20 or
+  later; convex 1.49 and newer require Node.js 22 or later. ES modules only.
 - `Slugs` runs in Convex queries, mutations and actions: it only calls
   `ctx.runQuery` and `ctx.runMutation`.
 - React: optional peer `react@>=18`, used only by `@vllnt/convex-slugs/react`.

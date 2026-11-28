@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, components } from "./_generated/api";
 import schema from "./schema";
 import { register } from "../../src/test";
 
@@ -418,5 +418,34 @@ describe("slugs — behaviour the README documents", () => {
     expect(
       await t.mutation(api.example.reserve, { slug: "mine", resourceRef: "r1" }),
     ).toEqual({ ok: false, reason: "SLUG_TAKEN" });
+  });
+});
+
+describe("slugs — documented defaults", () => {
+  test("default options: minLength 1, maxLength 256, scope global, case folded", async () => {
+    const t = setup();
+    expect(
+      await t.mutation(api.example.reserve, { slug: "a".repeat(256), resourceRef: "max" }),
+    ).toEqual({ ok: true });
+    expect(
+      await t.mutation(api.example.reserve, { slug: "b".repeat(257), resourceRef: "over" }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+    expect(
+      await t.mutation(api.example.reserve, { slug: "B", resourceRef: "one" }),
+    ).toEqual({ ok: true });
+    expect(
+      await t.query(components.slugs.queries.resolve, { scope: "global", slug: "b" }),
+    ).toBe("one");
+  });
+
+  test("one resourceRef may hold several slugs; slugForResource returns one of them", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "first", resourceRef: "multi" });
+    await t.mutation(api.example.reserve, { slug: "second", resourceRef: "multi" });
+    expect(await t.query(api.example.resolve, { slug: "first" })).toBe("multi");
+    expect(await t.query(api.example.resolve, { slug: "second" })).toBe("multi");
+    expect(["first", "second"]).toContain(
+      await t.query(api.example.slugForResource, { resourceRef: "multi" }),
+    );
   });
 });
