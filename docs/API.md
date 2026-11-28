@@ -61,10 +61,12 @@ Claims `slug` for `resourceRef`. Returns `{ ok: true }`, or `{ ok: false, reason
 with `SLUG_INVALID`, `SLUG_RESERVED` or `SLUG_TAKEN`. `SLUG_TAKEN` is returned
 whenever the slug is held in the scope, also when the same `resourceRef` holds
 it. Reserving a slug that was renamed away deletes the redirect that started at
-it. Throws `INVALID_ARGUMENT` for `scope: ""` or `resourceRef: ""`, unless the
-slug already failed the client checks: then it returns `SLUG_INVALID` (or
-`SLUG_RESERVED`) without calling the component. One `resourceRef` may hold
-several slugs.
+it. Throws `INVALID_ARGUMENT` for `scope: ""` or `resourceRef: ""`, or a
+`scope` or `resourceRef` over 1024 UTF-16 code units, unless the slug already
+failed the client checks: then it returns `SLUG_INVALID` (or `SLUG_RESERVED`)
+without calling the component. A slug over 1024 UTF-16 code units returns
+`SLUG_INVALID` from the component even when `maxLength` is larger (see
+[Limits](#limits)). One `resourceRef` may hold several slugs.
 
 ### `release`
 
@@ -89,7 +91,8 @@ options. Checks, in order:
 
 1. `toSlug` fails the options: `SLUG_INVALID` or `SLUG_RESERVED` (client).
 2. `fromSlug === toSlug` after normalization: `SLUG_TAKEN`, before any read.
-3. `toSlug` outside the length bounds: `SLUG_INVALID` (component).
+3. `toSlug` outside the length bounds or over 1024 UTF-16 code units:
+   `SLUG_INVALID` (component).
 4. `fromSlug` not held: `SLUG_NOT_FOUND`.
 5. `toSlug` held: `SLUG_TAKEN`.
 
@@ -97,7 +100,9 @@ On success, redirects that pointed at `fromSlug` are repointed to `toSlug`, so a
 chain A -> B -> C leaves A -> C and B -> C. At most one redirect row exists per
 `(scope, fromSlug)`. A redirect that started at `toSlug` is deleted, so renaming
 back (A -> B, then B -> A) leaves only B -> A and no redirect starts at a live
-slug. Throws `INVALID_ARGUMENT` for `scope: ""`.
+slug. Throws `INVALID_ARGUMENT` for `scope: ""` or a `scope` over 1024 UTF-16
+code units. `fromSlug` is not capped, so a slug an older version stored over
+the cap can be renamed to a shorter one.
 
 ### `resolve`
 
@@ -149,7 +154,9 @@ interface SlugsOptions {
 
 `new Slugs` throws `INVALID_OPTIONS` unless `defaultScope` is non-empty,
 `minLength` and `maxLength` are integers, `minLength >= 0`, and
-`maxLength >= max(1, minLength)`. A `pattern` with the `g` or `y` flag is reset
+`maxLength >= max(1, minLength)`. A `maxLength` over 1024 is accepted, but the
+component still returns `SLUG_INVALID` for a slug over 1024 UTF-16 code units
+(see [Limits](#limits)). A `pattern` with the `g` or `y` flag is reset
 before each test, so the same slug always gets the same verdict.
 
 ### `SlugWriteResult`
@@ -221,12 +228,12 @@ the mounted component, the same shape as `SlugsComponent`.
 
 `reserve` and `rename` return `{ ok: false, reason }` instead of throwing:
 
-| Reason           | When                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, or fails `pattern` |
-| `SLUG_RESERVED`  | The normalized slug is in the normalized `reservedWords`                                    |
-| `SLUG_TAKEN`     | The slug is held in the scope, or `rename` got `fromSlug === toSlug` after normalization    |
-| `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                     |
+| Reason           | When                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, fails `pattern`, or is over 1024 UTF-16 code units (component cap) |
+| `SLUG_RESERVED`  | The normalized slug is in the normalized `reservedWords`                                                                                    |
+| `SLUG_TAKEN`     | The slug is held in the scope, or `rename` got `fromSlug === toSlug` after normalization                                                    |
+| `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                                                                     |
 
 Causes and fixes are in the README's
 [Errors and fixes](../README.md#errors-and-fixes) table.
@@ -235,15 +242,36 @@ Causes and fixes are in the README's
 
 Invalid input throws a `ConvexError` whose `data` is `{ code, message }`:
 
-| Code               | Thrown by                                          | When                                                                                                                     |
-| ------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `INVALID_OPTIONS`  | `new Slugs(...)`                                   | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `minLength >= 0` and `maxLength >= max(1, minLength)` |
-| `INVALID_ARGUMENT` | component mutations `reserve`, `release`, `rename` | Empty `scope`, empty `resourceRef` (`reserve`), or `bounds` that are not integers with `minLength <= maxLength`          |
+| Code               | Thrown by                                          | When                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`  | `new Slugs(...)`                                   | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `minLength >= 0` and `maxLength >= max(1, minLength)`                                                                      |
+| `INVALID_ARGUMENT` | component mutations `reserve`, `release`, `rename` | Empty `scope`, empty `resourceRef` (`reserve`), a `scope` or `resourceRef` over 1024 UTF-16 code units (`reserve`, `rename`), or `bounds` that are not integers with `minLength <= maxLength` |
 
 The client always sends integer bounds from its validated options, so through
-`Slugs` only an empty `scope` or `resourceRef` raises `INVALID_ARGUMENT`. The
+`Slugs` only an empty `scope` or `resourceRef`, or one over 1024 UTF-16 code
+units, raises `INVALID_ARGUMENT`. The
 queries do not throw for an empty scope. Arguments of the wrong type are
 rejected by Convex argument validation.
+
+## Limits
+
+`reserve` and `rename` cap what they write at 1024 UTF-16 code units
+(`string.length`), the same counting as `minLength` and `maxLength`. The cap
+holds whatever `maxLength` or `bounds` say:
+
+| Input                                   | Over 1024 code units      |
+| --------------------------------------- | ------------------------- |
+| `slug` (`reserve`), `toSlug` (`rename`) | returns `SLUG_INVALID`    |
+| `scope` (`reserve`, `rename`)           | throws `INVALID_ARGUMENT` |
+| `resourceRef` (`reserve`)               | throws `INVALID_ARGUMENT` |
+
+A value of exactly 1024 passes. 😀 counts 2, so 512 😀 pass and 513 are
+rejected, although that is only 513 code points. `release`, `fromSlug` and the
+queries are not capped. Rows a version before 0.2.0 stored over the cap stay
+readable through `resolve`, `redirectFor` and `slugForResource`, and `release`
+removes them. Renaming such a slug to a shorter one works; `reserve` or
+`rename` onto it returns `SLUG_INVALID`, and writes in such a scope throw
+`INVALID_ARGUMENT`.
 
 ## Normalization
 

@@ -3,9 +3,18 @@ import { internalMutation, mutation } from "./_generated/server.js";
 import { lengthBounds, reserveResult } from "./validators.js";
 
 /**
+ * Hard cap, in UTF-16 code units (`string.length`), on the slug, `scope` and
+ * `resourceRef` that `reserve` and `rename` write. It holds whatever `bounds`
+ * the caller passes. `release` and the queries do not apply it, so rows stored
+ * by an older version with longer values stay readable and removable.
+ */
+const MAX_INPUT_LENGTH = 1024;
+
+/**
  * Reject malformed arguments with `ConvexError({ code: "INVALID_ARGUMENT" })`.
  * Expected slug rejections stay typed `{ ok: false, reason }` results; this
- * covers input no correct client sends (empty scope/ref, non-integer bounds).
+ * covers input no correct client sends (empty scope/ref, non-integer bounds,
+ * and on writes a scope or ref over {@link MAX_INPUT_LENGTH}).
  */
 function assertArgs(args: {
   scope: string;
@@ -13,19 +22,36 @@ function assertArgs(args: {
   bounds?: { minLength: number; maxLength: number };
 }): void {
   const { scope, resourceRef, bounds } = args;
+  // Only `reserve` and `rename` pass `bounds`; they are the size-capped writes.
+  const isWrite = bounds !== undefined;
   const badBounds =
-    bounds !== undefined &&
+    isWrite &&
     !(
       Number.isInteger(bounds.minLength) &&
       Number.isInteger(bounds.maxLength) &&
       bounds.minLength <= bounds.maxLength
     );
-  if (scope === "" || resourceRef === "" || badBounds) {
+  const oversized =
+    isWrite &&
+    (scope.length > MAX_INPUT_LENGTH ||
+      (resourceRef ?? "").length > MAX_INPUT_LENGTH);
+  if (scope === "" || resourceRef === "" || badBounds || oversized) {
     throw new ConvexError({
       code: "INVALID_ARGUMENT",
-      message: "scope and resourceRef must be non-empty; bounds must be integers with min <= max",
+      message: `scope and resourceRef must be non-empty, and at most ${String(MAX_INPUT_LENGTH)} UTF-16 code units on reserve and rename; bounds must be integers with min <= max`,
     });
   }
+}
+
+/** Whether a slug to be written is empty, outside `bounds`, or over the cap. */
+function slugOutOfBounds(
+  slug: string,
+  bounds: { minLength: number; maxLength: number },
+): boolean {
+  return (
+    slug.length < Math.max(1, bounds.minLength) ||
+    slug.length > Math.min(bounds.maxLength, MAX_INPUT_LENGTH)
+  );
 }
 
 /**
@@ -35,7 +61,9 @@ function assertArgs(args: {
  * redirect row is removed (the slug is a live name again).
  *
  * @returns `{ ok: true }`, or `{ ok: false, reason }` where reason is
- * `SLUG_INVALID` (empty/over length) or `SLUG_TAKEN` (already held in scope).
+ * `SLUG_INVALID` (empty, outside `bounds` or over {@link MAX_INPUT_LENGTH}) or
+ * `SLUG_TAKEN` (already held in scope).
+ * @throws `INVALID_ARGUMENT` for an empty, or over-cap, `scope` or `resourceRef`.
  */
 export const reserve = mutation({
   args: {
@@ -47,10 +75,7 @@ export const reserve = mutation({
   returns: reserveResult,
   handler: async (ctx, args) => {
     assertArgs(args);
-    if (args.slug.length < Math.max(1, args.bounds.minLength)) {
-      return { ok: false, reason: "SLUG_INVALID" as const };
-    }
-    if (args.slug.length > args.bounds.maxLength) {
+    if (slugOutOfBounds(args.slug, args.bounds)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
     const existing = await ctx.db
@@ -129,9 +154,15 @@ export const release = mutation({
  * Self-rename (`fromSlug === toSlug`) is rejected with `SLUG_TAKEN` before any
  * DB read, preventing a self-loop redirect from being created.
  *
+ * `fromSlug` is not size-capped: it is only a lookup key, so a value over the
+ * cap writes nothing unless an older version stored it, and renaming such a
+ * legacy row to a short `toSlug` is the way to bring it under the cap.
+ *
  * @returns `{ ok: true }`, or `{ ok: false, reason }` where reason is
- * `SLUG_INVALID` (empty/over length `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not
- * held), or `SLUG_TAKEN` (`toSlug` already held or equals `fromSlug`).
+ * `SLUG_INVALID` (empty, outside `bounds` or over {@link MAX_INPUT_LENGTH}
+ * `toSlug`), `SLUG_NOT_FOUND` (`fromSlug` not held), or `SLUG_TAKEN` (`toSlug`
+ * already held or equals `fromSlug`).
+ * @throws `INVALID_ARGUMENT` for an empty, or over-cap, `scope`.
  */
 export const rename = mutation({
   args: {
@@ -146,10 +177,7 @@ export const rename = mutation({
     if (args.fromSlug === args.toSlug) {
       return { ok: false, reason: "SLUG_TAKEN" as const };
     }
-    if (args.toSlug.length < Math.max(1, args.bounds.minLength)) {
-      return { ok: false, reason: "SLUG_INVALID" as const };
-    }
-    if (args.toSlug.length > args.bounds.maxLength) {
+    if (slugOutOfBounds(args.toSlug, args.bounds)) {
       return { ok: false, reason: "SLUG_INVALID" as const };
     }
     const from = await ctx.db

@@ -18,6 +18,17 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
   `rename`: an empty `scope`, an empty `resourceRef` (`reserve`), or `bounds`
   that are not integers or have `minLength > maxLength`. Rows that 0.1.0 stored
   under scope `""` can no longer be released or renamed.
+- **Breaking:** `reserve` and `rename` cap what they write at 1024 UTF-16 code
+  units (`string.length`), whatever `maxLength` or `bounds` say: a longer slug
+  or `toSlug` returns `SLUG_INVALID`, and a longer `scope` (`reserve`,
+  `rename`) or `resourceRef` (`reserve`) throws `INVALID_ARGUMENT`. Shorten such
+  values; `new Slugs` still accepts a `maxLength` over 1024, but the component
+  rejects the longer slugs. Rows stored over the cap before 0.2.0 stay readable,
+  and `release` still removes them. Updating such a row: `rename` from an
+  over-cap slug to a shorter one works; `reserve` or `rename` onto an over-cap
+  slug returns `SLUG_INVALID` and leaves the row; `reserve` and `rename` in an
+  over-cap scope throw `INVALID_ARGUMENT`; a row with an over-cap `resourceRef`
+  keeps it when renamed.
 
 ### Fixed
 

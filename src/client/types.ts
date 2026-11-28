@@ -20,7 +20,11 @@ export interface SlugsOptions {
   foldCase?: boolean;
   /** Minimum slug length after normalization. Default `1`. */
   minLength?: number;
-  /** Maximum slug length after normalization. Default `256`. */
+  /**
+   * Maximum slug length after normalization, in UTF-16 code units. Default
+   * `256`. A value over 1024 is accepted, but the component still returns
+   * `SLUG_INVALID` for a slug over 1024 code units.
+   */
   maxLength?: number;
   /** Allowed charset; a slug failing it is rejected `SLUG_INVALID`. Default: none. */
   pattern?: RegExp;

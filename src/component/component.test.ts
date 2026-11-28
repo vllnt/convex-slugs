@@ -1,7 +1,10 @@
+import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api.js";
 import schema from "./schema.js";
+import { Slugs } from "../client/index.js";
+import type { SlugsComponent } from "../client/index.js";
 
 const modules = import.meta.glob("./**/*.ts");
 const scope = "global";
@@ -257,5 +260,292 @@ describe("slugs component — argument validation", () => {
     expect(await t.query(api.queries.resolve, { scope: "", slug: "old" })).toBe(
       "r",
     );
+  });
+});
+
+describe("slugs component — 1024 UTF-16 code unit cap on writes", () => {
+  const invalid = { data: { code: "INVALID_ARGUMENT" } };
+  // Bounds wider than the cap: the cap holds whatever the caller passes.
+  const wide = { minLength: 1, maxLength: 1_000_000 };
+  const at = "s".repeat(1024);
+  const over = "s".repeat(1025);
+
+  function write(
+    t: ReturnType<typeof setup>,
+    args: { scope?: string; slug?: string; resourceRef?: string },
+  ) {
+    return t.mutation(api.mutations.reserve, {
+      scope: args.scope ?? scope,
+      slug: args.slug ?? "s",
+      resourceRef: args.resourceRef ?? "r",
+      bounds: wide,
+    });
+  }
+
+  function move(
+    t: ReturnType<typeof setup>,
+    args: { scope?: string; fromSlug: string; toSlug: string },
+  ) {
+    return t.mutation(api.mutations.rename, {
+      scope: args.scope ?? scope,
+      fromSlug: args.fromSlug,
+      toSlug: args.toSlug,
+      bounds: wide,
+    });
+  }
+
+  test("reserve: a 1024-unit slug passes, 1025 is SLUG_INVALID", async () => {
+    const t = setup();
+    expect(await write(t, { slug: over })).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await write(t, { slug: at })).toEqual({ ok: true });
+    expect(await t.query(api.queries.resolve, { scope, slug: at })).toBe("r");
+  });
+
+  test("rename: a 1024-unit toSlug passes, 1025 is SLUG_INVALID", async () => {
+    const t = setup();
+    await write(t, { slug: "a" });
+    expect(await move(t, { fromSlug: "a", toSlug: over })).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await t.query(api.queries.resolve, { scope, slug: "a" })).toBe("r");
+    expect(await move(t, { fromSlug: "a", toSlug: at })).toEqual({ ok: true });
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "a" })).toBe(
+      at,
+    );
+  });
+
+  test("reserve and rename: a 1024-unit scope passes, 1025 throws INVALID_ARGUMENT", async () => {
+    const t = setup();
+    const atScope = "x".repeat(1024);
+    const overScope = "x".repeat(1025);
+    await expect(write(t, { scope: overScope })).rejects.toMatchObject(invalid);
+    await expect(
+      move(t, { scope: overScope, fromSlug: "a", toSlug: "b" }),
+    ).rejects.toMatchObject(invalid);
+    expect(await write(t, { scope: atScope, slug: "a" })).toEqual({ ok: true });
+    expect(
+      await move(t, { scope: atScope, fromSlug: "a", toSlug: "b" }),
+    ).toEqual({ ok: true });
+    expect(
+      await t.query(api.queries.resolve, { scope: atScope, slug: "b" }),
+    ).toBe("r");
+  });
+
+  test("reserve: a 1024-unit resourceRef passes, 1025 throws INVALID_ARGUMENT", async () => {
+    const t = setup();
+    await expect(
+      write(t, { resourceRef: "r".repeat(1025) }),
+    ).rejects.toMatchObject(invalid);
+    expect(await write(t, { resourceRef: "r".repeat(1024) })).toEqual({
+      ok: true,
+    });
+    expect(
+      await t.query(api.queries.slugForResource, {
+        scope,
+        resourceRef: "r".repeat(1024),
+      }),
+    ).toBe("s");
+  });
+
+  test("the cap counts UTF-16 code units, not code points or UTF-8 bytes", async () => {
+    const t = setup();
+    // 😀 is 1 code point, 2 UTF-16 code units and 4 UTF-8 bytes.
+    const emoji512 = "😀".repeat(512);
+    const emoji513 = "😀".repeat(513);
+    expect(emoji512.length).toBe(1024);
+    expect([...emoji513]).toHaveLength(513); // well under 1024 code points
+    expect(new TextEncoder().encode(emoji512)).toHaveLength(2048); // over 1024 bytes
+    expect(await write(t, { slug: emoji513 })).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await write(t, { slug: emoji512 })).toEqual({ ok: true });
+    // The boundary falls inside a surrogate pair: 1023 + 2 = 1025 units.
+    expect(await write(t, { slug: `${"a".repeat(1023)}😀` })).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await write(t, { slug: `${"a".repeat(1022)}😀` })).toEqual({
+      ok: true,
+    });
+    await expect(
+      write(t, { slug: "e", resourceRef: emoji513 }),
+    ).rejects.toMatchObject(invalid);
+    expect(await write(t, { slug: "e", resourceRef: emoji512 })).toEqual({
+      ok: true,
+    });
+  });
+
+  test("the client accepts maxLength over 1024; the component still caps the slug", async () => {
+    const t = setup();
+    // Drive the real client against the convex-test component.
+    const component = api as unknown as SlugsComponent;
+    type Reserve = typeof api.mutations.reserve;
+    const runner = {
+      runMutation: (ref: unknown, args: unknown) =>
+        t.mutation(ref as Reserve, args as FunctionArgs<Reserve>),
+    } as unknown as Parameters<Slugs["reserve"]>[0];
+    const slugs = new Slugs(component, { maxLength: 2048 });
+    expect(await slugs.reserve(runner, over, "r")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await slugs.reserve(runner, at, "r")).toEqual({ ok: true });
+  });
+});
+
+describe("slugs component — rows stored over the cap by an older version", () => {
+  const invalid = { data: { code: "INVALID_ARGUMENT" } };
+  const longSlug = "l".repeat(1025);
+  const longScope = "x".repeat(1025);
+  const longRef = "r".repeat(1025);
+
+  async function seed(t: ReturnType<typeof setup>) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert("slugs", { scope, slug: longSlug, resourceRef: "a" });
+      await ctx.db.insert("slugs", { scope, slug: "b", resourceRef: longRef });
+      await ctx.db.insert("slugs", {
+        scope: longScope,
+        slug: "c",
+        resourceRef: "c",
+      });
+      await ctx.db.insert("redirects", {
+        scope,
+        fromSlug: "old",
+        toSlug: longSlug,
+      });
+    });
+  }
+
+  test("resolve, redirectFor and slugForResource still return them", async () => {
+    const t = setup();
+    await seed(t);
+    expect(await t.query(api.queries.resolve, { scope, slug: longSlug })).toBe(
+      "a",
+    );
+    expect(
+      await t.query(api.queries.slugForResource, { scope, resourceRef: "a" }),
+    ).toBe(longSlug);
+    expect(
+      await t.query(api.queries.slugForResource, {
+        scope,
+        resourceRef: longRef,
+      }),
+    ).toBe("b");
+    expect(await t.query(api.queries.resolve, { scope, slug: "b" })).toBe(
+      longRef,
+    );
+    expect(
+      await t.query(api.queries.resolve, { scope: longScope, slug: "c" }),
+    ).toBe("c");
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "old" })).toBe(
+      longSlug,
+    );
+  });
+
+  test("release removes them and the redirects that point at them", async () => {
+    const t = setup();
+    await seed(t);
+    await t.mutation(api.mutations.release, { scope, slug: longSlug });
+    await t.mutation(api.mutations.release, { scope, slug: "b" });
+    await t.mutation(api.mutations.release, { scope: longScope, slug: "c" });
+    expect(
+      await t.query(api.queries.resolve, { scope, slug: longSlug }),
+    ).toBeNull();
+    expect(
+      await t.query(api.queries.redirectFor, { scope, slug: "old" }),
+    ).toBeNull();
+    expect(
+      await t.query(api.queries.slugForResource, {
+        scope,
+        resourceRef: longRef,
+      }),
+    ).toBeNull();
+    expect(
+      await t.query(api.queries.resolve, { scope: longScope, slug: "c" }),
+    ).toBeNull();
+  });
+
+  test("rename from an over-cap slug to a short one works and repoints its redirects", async () => {
+    const t = setup();
+    await seed(t);
+    expect(await rename(t, longSlug, "short")).toEqual({ ok: true });
+    expect(await t.query(api.queries.resolve, { scope, slug: "short" })).toBe(
+      "a",
+    );
+    expect(
+      await t.query(api.queries.redirectFor, { scope, slug: longSlug }),
+    ).toBe("short");
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "old" })).toBe(
+      "short",
+    );
+  });
+
+  test("a row with an over-cap resourceRef can be renamed and keeps its ref", async () => {
+    const t = setup();
+    await seed(t);
+    expect(await rename(t, "b", "b2")).toEqual({ ok: true });
+    expect(
+      await t.query(api.queries.slugForResource, {
+        scope,
+        resourceRef: longRef,
+      }),
+    ).toBe("b2");
+  });
+
+  test("reserving or renaming onto an over-cap slug is SLUG_INVALID and leaves the row", async () => {
+    const t = setup();
+    await seed(t);
+    const wide = { minLength: 1, maxLength: 1_000_000 };
+    expect(
+      await t.mutation(api.mutations.reserve, {
+        scope,
+        slug: longSlug,
+        resourceRef: "z",
+        bounds: wide,
+      }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+    expect(
+      await t.mutation(api.mutations.rename, {
+        scope,
+        fromSlug: "b",
+        toSlug: longSlug,
+        bounds: wide,
+      }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+    expect(await t.query(api.queries.resolve, { scope, slug: longSlug })).toBe(
+      "a",
+    );
+    expect(await t.query(api.queries.resolve, { scope, slug: "b" })).toBe(
+      longRef,
+    );
+  });
+
+  test("reserve and rename in an over-cap scope throw INVALID_ARGUMENT", async () => {
+    const t = setup();
+    await seed(t);
+    await expect(
+      t.mutation(api.mutations.reserve, {
+        scope: longScope,
+        slug: "d",
+        resourceRef: "d",
+        bounds,
+      }),
+    ).rejects.toMatchObject(invalid);
+    await expect(
+      t.mutation(api.mutations.rename, {
+        scope: longScope,
+        fromSlug: "c",
+        toSlug: "c2",
+        bounds,
+      }),
+    ).rejects.toMatchObject(invalid);
+    expect(
+      await t.query(api.queries.resolve, { scope: longScope, slug: "c" }),
+    ).toBe("c");
   });
 });
