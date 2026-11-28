@@ -11,13 +11,13 @@ const OSS = "https://oss.vllnt.com";
 const CODE_FOLDERS = ["src", "example"];
 
 /**
- * @typedef {{ code: string, lang: string, line: number }} Block
+ * @typedef {{ code: string, end: number, lang: string, line: number }} Block
  * @typedef {{ lang: string, line: number, lines: string[] }} OpenBlock
  * @typedef {{ body: string, line: number, name: string }} Section
  * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} Metadata
  */
 
-/** Fenced code blocks with 1-based start lines. @param {string} text */
+/** Fenced code blocks with 1-based opening and closing fence lines. @param {string} text */
 export function codeBlocks(text) {
   /** @type {{ blocks: Block[], open: OpenBlock | undefined }} */
   const start = { blocks: [], open: undefined };
@@ -31,7 +31,7 @@ export function codeBlocks(text) {
       return { ...current, open };
     }
     const { lang, line: at, lines } = current.open;
-    const block = { code: lines.join("\n"), lang, line: at };
+    const block = { code: lines.join("\n"), end: index + 1, lang, line: at };
     return { blocks: [...current.blocks, block], open: undefined };
   }, start);
   assert.equal(state.open, undefined, "unclosed code block");
@@ -41,11 +41,8 @@ export function codeBlocks(text) {
 /** Lines outside code blocks with 1-based line numbers. @param {string} text */
 function linesOutsideCode(text) {
   const inCode = new Set(
-    codeBlocks(text).flatMap(({ code, line }) =>
-      Array.from(
-        { length: code.split("\n").length + 2 },
-        (_, offset) => line + offset,
-      ),
+    codeBlocks(text).flatMap(({ end, line }) =>
+      Array.from({ length: end - line + 1 }, (_, offset) => line + offset),
     ),
   );
   return text

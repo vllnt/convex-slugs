@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { checkRelatedPackages } from "./check-documentation.mjs";
+import { checkRelatedPackages, sections } from "./check-documentation.mjs";
 
 /** @param {string} body */
 const readme = (body) =>
@@ -62,6 +62,23 @@ test("a README without the section fails", () => {
   assert.throws(() => {
     checkRelatedPackages("# x\n\n## Contributing\n", metadata, []);
   }, /no section Related packages/u);
+});
+
+test("an empty code block does not hide the next heading", () => {
+  const text = "# x\n\n```\n```\n## Related packages\n\nNone.\n";
+  assert.deepEqual(
+    sections(text).map((part) => part.name),
+    ["Related packages"],
+  );
+  checkRelatedPackages(text, metadata, []);
+});
+
+test("a code block holding one empty line ends at its fence", () => {
+  const text = "# x\n\n```\n\n```\n## Related packages\n\nNone.\n";
+  assert.deepEqual(
+    sections(text).map((part) => part.name),
+    ["Related packages"],
+  );
 });
 
 test("a heading inside a code block is not a section", () => {
