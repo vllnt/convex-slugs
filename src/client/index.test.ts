@@ -1,5 +1,6 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, test, vi } from "vitest";
+import type { ComponentApi } from "../component/_generated/component.js";
 import { Slugs } from "./index.js";
 import type { SlugsComponent } from "./index.js";
 
@@ -50,6 +51,58 @@ describe("Slugs client options", () => {
     expect(await slugs.reserve(c, "abcd", "r")).toEqual({ ok: true });
     expect(await slugs.reserve(c, "abc", "r")).toEqual({ ok: true });
     expect(c.runMutation).toHaveBeenCalledTimes(2);
+  });
+
+  test("an empty slug is SLUG_INVALID even with minLength 0", async () => {
+    const c = ctx();
+    const slugs = new Slugs(component, { minLength: 0 });
+    expect(await slugs.reserve(c, " ", "r")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(await slugs.rename(c, "a", "")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+    expect(c.runMutation).not.toHaveBeenCalled();
+  });
+
+  test("pattern runs against the normalized slug", async () => {
+    const c = ctx();
+    const slugs = new Slugs(component, { pattern: /^[a-z]+$/ });
+    expect(await slugs.reserve(c, " ADA ", "r")).toEqual({ ok: true });
+    expect(c.runMutation).toHaveBeenCalledWith("reserve", {
+      scope: "global",
+      slug: "ada",
+      resourceRef: "r",
+      bounds: { minLength: 1, maxLength: 256 },
+    });
+    const caseKept = new Slugs(component, {
+      foldCase: false,
+      pattern: /^[a-z]+$/,
+    });
+    expect(await caseKept.reserve(c, "ADA", "r")).toEqual({
+      ok: false,
+      reason: "SLUG_INVALID",
+    });
+  });
+
+  test("toLowerCase is not full Unicode case folding: STRASSE and straße differ", async () => {
+    const c = ctx();
+    const slugs = new Slugs(component);
+    await slugs.reserve(c, "STRASSE", "r");
+    await slugs.reserve(c, "straße", "r");
+    const sent = c.runMutation.mock.calls.map(
+      (call) => (call[1] as { slug: string }).slug,
+    );
+    expect(sent).toEqual(["strasse", "straße"]);
+  });
+
+  test("the generated ComponentApi and SlugsComponent are the same shape", () => {
+    const api = component as unknown as ComponentApi;
+    const asClient: SlugsComponent = api;
+    const asGenerated: ComponentApi = asClient;
+    expect(asGenerated).toBe(component);
   });
 
   test.each([

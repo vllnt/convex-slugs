@@ -1,6 +1,7 @@
 # API Reference — @vllnt/convex-slugs
 
-**Compatibility:** `convex@^1.45.0`; optional `react@>=18` for `./react`.
+**Compatibility:** `convex@^1.45.0`; optional `react@>=18` for `./react`;
+Node.js 20 or later (`engines.node` `>=20`).
 
 ## Entry points
 
