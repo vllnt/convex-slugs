@@ -12,9 +12,11 @@ Input that 0.1.0 accepted is now rejected. What to do:
 
 - `new Slugs(...)` throws a `ConvexError` with code `INVALID_OPTIONS` for an
   empty `defaultScope`, a `minLength` or `maxLength` that is not an integer
-  (for example `1.5` or `NaN`), a negative `minLength`, `minLength > maxLength`,
-  or `maxLength < 1`. A `NaN` `maxLength` used to disable the length cap. Fix
-  the options.
+  (for example `1.5`, `NaN` or `Infinity`), a negative `minLength`,
+  `minLength > maxLength`, or `maxLength < 1`. A `NaN` or `Infinity`
+  `maxLength` used to disable the length cap. A `new Slugs` at module top level
+  throws when Convex loads that file, so every function in it fails. Fix the
+  options; for "no client limit" use `maxLength: 1024`, the component's cap.
 - The component mutations `reserve`, `release` and `rename` throw a
   `ConvexError` with code `INVALID_ARGUMENT` for an empty `scope`, an empty
   `resourceRef` (`reserve`), or `bounds` that are not integers or have
@@ -32,15 +34,18 @@ Input that 0.1.0 accepted is now rejected. What to do:
   over-cap slug returns `SLUG_INVALID` and leaves the row; `reserve` and
   `rename` in an over-cap scope throw `INVALID_ARGUMENT`; a row with an over-cap
   `resourceRef` keeps it when renamed.
-- Reserved words are normalized like slugs, so `reservedWords: ["Admin"]` now
-  blocks `admin` with `SLUG_RESERVED` (0.1.0 never matched it while `foldCase`
-  was on). Remove a word from `reservedWords` if it must stay claimable.
+- Reserved words are normalized like slugs (NFC, `trim()`, and lowercase unless
+  `foldCase: false`), so `reservedWords: ["Admin"]` now blocks `admin` with
+  `SLUG_RESERVED` (0.1.0 never matched it while `foldCase` was on). Remove a
+  word from `reservedWords` if it must stay claimable.
 
 ### Fixed
 
 - `rename` no longer leaves a self-redirect when a slug is renamed back to an
   earlier name (A→B, then B→A left `redirectFor(A) === A` on a live slug). A
-  redirect starting at the new live name is now removed.
+  redirect starting at the new live name is now removed. Rows 0.1.0 already
+  wrote stay until that slug is renamed again or released: call `resolve`
+  before `redirectFor`, as the README's `profileBySlug` example does.
 - A `pattern` with the `g` or `y` flag gives the same verdict on every call
   instead of alternating.
 - `@vllnt/convex-slugs/test` type-checks for consumers under `nodenext` and
@@ -61,19 +66,13 @@ Input that 0.1.0 accepted is now rejected. What to do:
 ### Changed
 
 - `engines.node` is now `>=20` (was `>=18`): the lowest supported `convex`,
-  1.45, needs Node.js 20. Use Node.js 20 or later. The peer range stays
-  `convex@^1.45.0`.
+  1.45, needs Node.js 20, and convex 1.49 and newer need Node.js 22. Use
+  Node.js 20 or later. The peer range stays `convex@^1.45.0`.
 - Releases are published from CI with npm provenance. `@latest` comes only from
   a `vX.Y.Z` tag on `main`, and every push to `main` publishes a `canary` built
   from that commit.
-- Docs: README rewritten in the shared @vllnt section order (When to use, Quick
-  start, API table, Common tasks, Errors and fixes, Limits and gotchas,
-  Compatibility, Testing, Security, Links), with the install command for the
-  stable release, every reason and error code, and the concurrency and
-  normalization limits; "Related packages" lists none, and the hint to use
-  `@vllnt/convex-tokens` for secret keys is in the intro. `docs/API.md` has one
-  heading per export and method; `llms.txt` has When to use, an errors link
-  and the Ecosystem block last; TSDoc on every public export.
+- Docs: README, `docs/API.md` and `llms.txt` rewritten to cover every export,
+  reason and error code, limit and gotcha; TSDoc on every public export.
 - `package.json`: `description` is now "Convex component for unique slugs,
   handles and usernames per scope, with rename redirects, a TypeScript client
   and React hooks.", `keywords` list 11 search terms, and `homepage` points to
