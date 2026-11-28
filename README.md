@@ -18,7 +18,9 @@ const ref = await slugs.resolve(ctx, "ada"); // resourceRef | null
 Reserve a unique string (slug, `@handle`, username) against an opaque
 `resourceRef`, enforce uniqueness inside a scope, resolve it back, release it,
 and **redirect on rename**. Domain-neutral: article slugs, profile handles,
-workspace slugs — any public-URL key.
+workspace slugs — any public-URL key. For secret keys (share links, magic links)
+use [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens)
+instead: a slug is public and anyone can resolve it.
 
 ## Features
 
@@ -179,10 +181,8 @@ register(t);
 
 ## Related packages
 
-- [`@vllnt/convex-tokens`](https://www.npmjs.com/package/@vllnt/convex-tokens) —
-  use it when the key must stay secret (share links, magic links): tokens are
-  hashed, expire and can be revoked. A slug is a public, readable name that
-  anyone can resolve.
+None. This package has no dependency, shared test or example with another
+package.
 
 ## Contributing
 
