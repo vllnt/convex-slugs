@@ -4,7 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - Unreleased
+## [0.2.0] - Unreleased
+
+### Breaking
+
+Inputs that 0.1.0 accepted now throw a `ConvexError`:
+
+- `INVALID_OPTIONS` from `new Slugs(...)`: an empty `defaultScope`, a
+  `minLength` or `maxLength` that is not an integer (for example `1.5` or
+  `NaN`), a negative `minLength`, `minLength > maxLength`, or `maxLength < 1`.
+  A `NaN` `maxLength` used to disable the length cap.
+- `INVALID_ARGUMENT` from the component mutations `reserve`, `release` and
+  `rename`: an empty `scope`, an empty `resourceRef` (`reserve`), or `bounds`
+  that are not integers or have `minLength > maxLength`. Rows that 0.1.0 stored
+  under scope `""` can no longer be released or renamed.
 
 ### Fixed
 
@@ -25,11 +38,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Invalid input is rejected with a `ConvexError`: `INVALID_OPTIONS` from
-  `new Slugs(...)` (empty `defaultScope`, `minLength`/`maxLength` that are not
-  integers or inverted, a negative `minLength`, or `maxLength < 1`), and
-  `INVALID_ARGUMENT` from component mutations (empty `scope`/`resourceRef`,
-  invalid `bounds`). A `NaN` `maxLength` used to disable the length cap.
 - The npm package ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so the
   docs in `node_modules/@vllnt/convex-slugs/` match the installed version.
   `llms.txt` links to the shipped files with relative paths. `docs/API.md` now
@@ -47,6 +55,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file is missing from the packed tarball.
 - `package.json` `homepage` points to
   https://oss.vllnt.com/packages/convex-slugs.
+- Docs: README "Related packages" lists only packages this one works with in
+  code, which is none; the hint to use `@vllnt/convex-tokens` for secret keys
+  moved to the intro.
+- Release flow: canary and stable publishes run `pnpm test:package` first; it
+  type-checks every entry point and imports every runtime entry point,
+  including `./react` with React 18.
 
 ## [0.1.0] - 2026-09-01
 

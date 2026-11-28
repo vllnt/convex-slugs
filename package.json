@@ -1,6 +1,6 @@
 {
   "name": "@vllnt/convex-slugs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Unique slug and handle registry with rename redirects, as a Convex component",
   "license": "MIT",
   "type": "module",
@@ -47,15 +47,17 @@
     "build:codegen": "pnpm codegen && pnpm build",
     "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck.tsbuildinfo",
+    "typecheck:tests": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck-tests.tsbuildinfo --project tsconfig.test.json",
     "typecheck:ci": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck-ci.tsbuildinfo --project tsconfig.ci.json",
-    "lint": "pnpm check:agents && eslint --cache --cache-location node_modules/.cache/eslint/ .",
-    "test": "vitest run --passWithNoTests",
+    "lint": "pnpm check:agents && pnpm check:docs && eslint --cache --cache-location node_modules/.cache/eslint/ .",
+    "test": "pnpm typecheck:tests && vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "test:coverage": "pnpm typecheck:tests && vitest run --coverage --coverage.reporter=text",
     "generate:llms": "node scripts/generate-llms.mjs",
     "test:package": "node scripts/test-package.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test:coverage && pnpm typecheck && pnpm generate:llms",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
+    "check:docs": "node scripts/test-check-documentation.mjs && node scripts/check-documentation.mjs",
     "codegen": "pnpm convex codegen --component-dir ./src/component"
   },
   "peerDependencies": {

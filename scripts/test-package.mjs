@@ -68,6 +68,9 @@ try {
     "convex-test@0.0.56",
     "vite@8.2.2",
     "@types/node@22.20.2",
+    // Lowest supported React major (18), for the optional ./react entry.
+    "react@18.3.1",
+    "@types/react@18.3.31",
   ]);
 
   const installed = join(temporary, "node_modules", metadata.name);
@@ -93,12 +96,19 @@ try {
     `
 import { Slugs } from "@vllnt/convex-slugs";
 import type { ComponentApi } from "@vllnt/convex-slugs/_generated/component.js";
+import type { ComponentApi as BareComponentApi } from "@vllnt/convex-slugs/_generated/component";
 import config from "@vllnt/convex-slugs/convex.config.js";
-import { defineApp } from "convex/server";
+import bareConfig from "@vllnt/convex-slugs/convex.config";
+import { useResolve, useSlugAvailable } from "@vllnt/convex-slugs/react";
+import { defineApp, type FunctionReference } from "convex/server";
 declare const component: ComponentApi;
+declare const bareComponent: BareComponentApi;
+declare const resolve: FunctionReference<"query", "public", { slug: string; scope?: string }, string | null>;
 const client = new Slugs(component);
-const app = defineApp(); app.use(config);
-void client; void app;
+const bareClient = new Slugs(bareComponent);
+const app = defineApp(); app.use(config); app.use(bareConfig, { name: "bare" });
+const hooks = (): [string | null | undefined, boolean | undefined] => [useResolve(resolve, { slug: "ada" }), useSlugAvailable(resolve, { slug: "ada", scope: "users" }).available];
+void client; void bareClient; void app; void hooks;
 `,
   );
   run("pnpm", [
@@ -159,7 +169,7 @@ register(convexTest(host, {}), "custom");
   run("node", [
     "--input-type=module",
     "-e",
-    'import { Slugs } from "@vllnt/convex-slugs"; import config from "@vllnt/convex-slugs/convex.config.js"; if (!Slugs || !config) throw Error("missing export");',
+    'import { Slugs } from "@vllnt/convex-slugs"; import config from "@vllnt/convex-slugs/convex.config.js"; import bareConfig from "@vllnt/convex-slugs/convex.config"; import { useResolve, useSlugAvailable } from "@vllnt/convex-slugs/react"; if (!Slugs || !config || !bareConfig || typeof useResolve !== "function" || typeof useSlugAvailable !== "function") throw Error("missing export");',
   ]);
 } finally {
   rmSync(temporary, { force: true, recursive: true });
