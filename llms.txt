@@ -15,6 +15,9 @@ mutation transaction. Slugs are normalized with NFC, `trim()` and (by default)
 `SLUG_RESERVED`, `SLUG_TAKEN`, `SLUG_NOT_FOUND`) instead of throwing. Invalid
 input throws `ConvexError` with `data.code` `INVALID_OPTIONS` or
 `INVALID_ARGUMENT`. Defaults: scope `"global"`, `minLength` 1, `maxLength` 256.
+`reserve` and `rename` cap writes at 1024 UTF-16 code units (`string.length`):
+a longer slug returns `SLUG_INVALID`, a longer `scope` or `resourceRef` throws
+`INVALID_ARGUMENT`; `release` and the queries are not capped.
 The host owns auth and the meaning of the opaque `resourceRef`. React hooks
 `useSlugAvailable` and `useResolve` take the host's own public query.
 

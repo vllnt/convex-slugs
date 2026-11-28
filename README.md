@@ -203,7 +203,7 @@ export function HandleField() {
 
 | `reason`         | Cause                                                                                                                                  | Fix                                                                                          |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, or fails `pattern`                                            | Show the rule to the user; for `rename` only `toSlug` is checked                             |
+| `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, fails `pattern`, or is over the component's cap of 1024 UTF-16 code units (`string.length`) | Show the rule to the user; for `rename` only `toSlug` is checked. Keep `maxLength` at 1024 or less so the client rule matches the cap |
 | `SLUG_RESERVED`  | The normalized slug is in `reservedWords`                                                                                              | Ask for another slug                                                                         |
 | `SLUG_TAKEN`     | The slug is held in the scope (by anyone, including the same `resourceRef`), or `rename` got `fromSlug === toSlug` after normalization | Ask for another slug; for `rename`, skip the call when both names normalize to the same slug |
 | `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                                                                | Read the current slug with `slugForResource` and rename that one                             |
@@ -216,7 +216,7 @@ the client first, so a slug that fails those checks returns `SLUG_INVALID` (or
 | Code               | Message                                                                                                                                       | Cause                                                                                                                                                                                | Fix                                                                                                                  |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `INVALID_OPTIONS`  | `Slugs options: defaultScope must be non-empty; minLength and maxLength must be integers with 0 <= minLength <= maxLength and maxLength >= 1` | `new Slugs(...)` got an empty `defaultScope`, a non-integer or negative `minLength`, a non-integer `maxLength`, or `maxLength` below `max(1, minLength)`                             | Fix the options. A `new Slugs` at module top level throws when Convex loads that file, so every function in it fails |
-| `INVALID_ARGUMENT` | `scope and resourceRef must be non-empty; bounds must be integers with min <= max`                                                            | `reserve`, `release` or `rename` got `scope: ""`, or `reserve` got `resourceRef: ""`; or a direct component call passed `bounds` that are not integers with `minLength <= maxLength` | Pass a non-empty scope (or omit it for `defaultScope`) and a non-empty `resourceRef`                                 |
+| `INVALID_ARGUMENT` | `scope and resourceRef must be non-empty, and at most 1024 UTF-16 code units on reserve and rename; bounds must be integers with min <= max` | `reserve`, `release` or `rename` got `scope: ""`, or `reserve` got `resourceRef: ""`; `reserve` or `rename` got a `scope`, or `reserve` a `resourceRef`, over 1024 UTF-16 code units; or a direct component call passed `bounds` that are not integers with `minLength <= maxLength` | Pass a non-empty scope (or omit it for `defaultScope`) and a non-empty `resourceRef`, each at most 1024 UTF-16 code units |
 
 Arguments of the wrong type are rejected by Convex argument validation before
 the component runs.
@@ -233,6 +233,20 @@ the component runs.
   Defaults: `minLength: 1`, `maxLength: 256`,
   `defaultScope: "global"`, `foldCase: true`, `reservedWords: []`, no
   `pattern`. An empty slug is always `SLUG_INVALID`, even with `minLength: 0`.
+- The component caps what `reserve` and `rename` write at 1024 UTF-16 code
+  units (`string.length`, counted like `maxLength`), whatever `maxLength` or
+  `bounds` say: a longer slug returns `SLUG_INVALID`, and a longer `scope` or
+  `resourceRef` throws `INVALID_ARGUMENT`. For example 512 😀 (1024 units)
+  passes and 513 (1026 units) is rejected. `new Slugs` still accepts a
+  `maxLength` over 1024, but slugs longer than 1024 are rejected by the
+  component. `release` and the queries are not capped.
+- Rows that a version before 0.2.0 stored with a slug, `scope` or
+  `resourceRef` over 1024 units stay readable with `resolve`, `redirectFor`
+  and `slugForResource`, and `release` removes them. `rename` from such a slug
+  to a shorter one works and records the redirect; `reserve` or `rename` onto
+  such a slug returns `SLUG_INVALID`; `reserve` and `rename` in such a scope
+  throw `INVALID_ARGUMENT`. A row with a long `resourceRef` keeps it when
+  renamed.
 - `pattern` and `reservedWords` run against the normalized slug, so with
   `foldCase: true` a pattern of `/^[a-z]+$/` accepts `"ADA"`.
 - `release` is idempotent and always returns `null`: releasing a slug that is
@@ -336,7 +350,7 @@ one slug.
   are callable only from the host's own functions. A host that calls
   `components.slugs` directly instead of through `Slugs` skips normalization,
   `pattern` and reserved words; the component then only rejects an empty slug
-  and one outside the `bounds` the caller passes.
+  and one outside the `bounds` the caller passes or over the 1024-unit cap.
 - Each `reserve` and `rename` is one Convex mutation (serializable): of
   simultaneous claims on one slug, one succeeds and the others get
   `SLUG_TAKEN`.
