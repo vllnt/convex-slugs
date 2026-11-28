@@ -1,68 +1,35 @@
-<!-- Badges -->
-
-[![Convex Component](https://img.shields.io/badge/convex-component-EE342F.svg)](https://www.convex.dev/components)
-[![npm](https://img.shields.io/npm/v/@vllnt/convex-slugs.svg)](https://www.npmjs.com/package/@vllnt/convex-slugs)
-[![CI](https://github.com/vllnt/convex-slugs/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-slugs/actions/workflows/ci.yml)
-[![license](https://img.shields.io/npm/l/@vllnt/convex-slugs.svg)](./LICENSE)
-
 # @vllnt/convex-slugs
 
-Unique slug and handle registry with rename redirects, as a Convex component.
+Convex component for unique slugs, handles and usernames per scope, with rename redirects, a TypeScript client and React hooks.
 
-```ts
-const slugs = new Slugs(components.slugs);
-await slugs.reserve(ctx, "ada", userId); // { ok: true } | { ok: false, reason }
-const ref = await slugs.resolve(ctx, "ada"); // resourceRef | null
-```
+## For coding agents
 
-Reserve a unique string (slug, `@handle`, username) against an opaque
-`resourceRef`, enforce uniqueness inside a scope, resolve it back, release it,
-and **redirect on rename**. Domain-neutral: article slugs, profile handles,
-workspace slugs — any public-URL key. For secret keys (share links, magic links)
-use [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens)
-instead: a slug is public and anyone can resolve it.
+Docs for the installed version are in `node_modules/@vllnt/convex-slugs/`:
+`docs/API.md`, `llms.txt`, `CHANGELOG.md` and the TypeScript `src/`. Read them
+before writing code against this package.
 
-## Features
+## When to use
 
-- **Atomic uniqueness** per `(scope, slug)` — rides the Convex mutation
-  transaction, no double-reserve.
-- **Scopes** — global by default, or namespace per tenant / locale / type.
-- **Rename + redirects** — renaming records an old → new redirect for link
-  preservation.
-- **Chain-safe redirects** — chains collapse (A→B→C ⇒ `redirectFor(A) === C`),
-  one row per source.
-- **Reverse lookup** — find the slug currently held by a `resourceRef`.
-- **Case folding + NFC** — case-insensitive (opt-out); NFC unifies canonically
-  equivalent Unicode spellings, not all look-alike characters.
-- **Configurable input rules** — length bounds, charset `pattern`,
-  `reservedWords`; typed rejection reasons.
-- **Typed write rejections** — expected conflicts return
-  `{ ok: false, reason }`; invalid configuration and Convex/runtime failures can
-  still throw.
+- Use it when each public name (article slug, `@handle`, username, workspace
+  slug) must be unique inside a scope, even under concurrent claims.
+- Use it when renaming must keep old URLs working through a redirect.
+- Use it when you need lookups both ways: slug to resource and resource to slug.
+- Do not use it when the key must stay secret (share links, magic links,
+  invites): a slug is public and anyone can resolve it. Use
+  [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens).
 
-## Installation
+## Install
 
 ```bash
 pnpm add @vllnt/convex-slugs
 ```
 
-Requires `convex@^1.45.0`; React `>=18` is optional for `./react` only. The
-command installs the stable release. Prereleases are published under the
-`canary` tag (`@vllnt/convex-slugs@canary`); pin a resolved canary version for
-reproducible installs.
-
-### For coding agents
-
-The docs are bundled in the package at `node_modules/@vllnt/convex-slugs/docs/`,
-next to `llms.txt`, `CHANGELOG.md`, `src/` and `dist/`. They match the installed
-version. Read them before writing code against this package.
-
-## Usage
+## Quick start
 
 ```ts
 // convex/convex.config.ts
-import { defineApp } from "convex/server";
 import slugs from "@vllnt/convex-slugs/convex.config";
+import { defineApp } from "convex/server";
 
 const app = defineApp();
 app.use(slugs);
@@ -70,114 +37,303 @@ export default app;
 ```
 
 ```ts
-// convex/handles.ts — host owns auth; pass an opaque resourceRef in.
+// convex/handles.ts
+import { Slugs } from "@vllnt/convex-slugs";
+import { ConvexError, v } from "convex/values";
+
 import { components } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
-import { Slugs } from "@vllnt/convex-slugs";
 
 const slugs = new Slugs(components.slugs);
 
 export const claim = mutation({
   args: { handle: v.string() },
+  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
   handler: async (ctx, { handle }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
-    return slugs.reserve(ctx, handle, identity.tokenIdentifier);
+    const user = await ctx.auth.getUserIdentity();
+    if (user === null) throw new ConvexError("not signed in");
+    return slugs.reserve(ctx, handle, user.subject);
   },
 });
 
 export const lookup = query({
-  args: { slug: v.string(), scope: v.optional(v.string()) },
-  handler: (ctx, { slug }) => slugs.resolve(ctx, slug, "global"),
+  args: { slug: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: (ctx, { slug }) => slugs.resolve(ctx, slug),
 });
 ```
 
-Client defaults: `defaultScope: "global"`, `foldCase: true`, `minLength: 1`,
-`maxLength: 256`, `reservedWords: []`; `pattern` is optional. Configure these in
-`new Slugs(component, options)`; see [the API reference](docs/API.md).
+Run `npx convex dev` once to generate `components.slugs`. The component never
+reads auth: the host picks the `resourceRef` (here the user's `subject`) and
+decides who may claim, rename or release a slug.
 
-## API Reference
-
-| Method                                      | Kind     | Result                                                                                        |
-| ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `reserve(ctx, slug, resourceRef, scope?)`   | mutation | `{ ok: true }` or `{ ok: false, reason }` (`SLUG_INVALID` \| `SLUG_RESERVED` \| `SLUG_TAKEN`) |
-| `release(ctx, slug, scope?)`                | mutation | `null` (idempotent)                                                                           |
-| `rename(ctx, fromSlug, toSlug, scope?)`     | mutation | `{ ok }` (`SLUG_INVALID` \| `SLUG_RESERVED` \| `SLUG_NOT_FOUND` \| `SLUG_TAKEN`)              |
-| `resolve(ctx, slug, scope?)`                | query    | `resourceRef \| null`                                                                         |
-| `redirectFor(ctx, slug, scope?)`            | query    | `toSlug \| null`                                                                              |
-| `slugForResource(ctx, resourceRef, scope?)` | query    | `slug \| null`                                                                                |
+## API
 
 Full reference: [docs/API.md](docs/API.md).
 
-## React
+| Export                                                                     | Import from                                | What it does                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------- |
+| [`Slugs`](docs/API.md#slugs)                                               | `@vllnt/convex-slugs`                      | Host client: `new Slugs(components.slugs, options?)`                             |
+| [`reserve(ctx, slug, resourceRef, scope?)`](docs/API.md#reserve)           | `Slugs` method, mutation                   | Claim a free slug; returns `{ ok, reason? }`                                     |
+| [`release(ctx, slug, scope?)`](docs/API.md#release)                        | `Slugs` method, mutation                   | Free a slug and the redirects pointing at it; returns `null`                     |
+| [`rename(ctx, fromSlug, toSlug, scope?)`](docs/API.md#rename)              | `Slugs` method, mutation                   | Move a held slug and record `fromSlug` -> `toSlug`                               |
+| [`resolve(ctx, slug, scope?)`](docs/API.md#resolve)                        | `Slugs` method, query                      | The `resourceRef` holding `slug`, or `null`                                      |
+| [`redirectFor(ctx, slug, scope?)`](docs/API.md#redirectfor)                | `Slugs` method, query                      | The live slug a renamed-away `slug` points to, or `null`                         |
+| [`slugForResource(ctx, resourceRef, scope?)`](docs/API.md#slugforresource) | `Slugs` method, query                      | The slug held by `resourceRef`, or `null`                                        |
+| [`SlugsComponent`](docs/API.md#slugscomponent)                             | `@vllnt/convex-slugs` (type)               | Type of `components.slugs`                                                       |
+| [`SlugsOptions`](docs/API.md#slugsoptions)                                 | `@vllnt/convex-slugs` (type)               | `{ defaultScope?, foldCase?, minLength?, maxLength?, pattern?, reservedWords? }` |
+| [`SlugWriteResult`](docs/API.md#slugwriteresult)                           | `@vllnt/convex-slugs` (type)               | Result of `reserve` and `rename`                                                 |
+| [`useSlugAvailable`](docs/API.md#useslugavailable)                         | `@vllnt/convex-slugs/react`                | `useSlugAvailable(lookupRef, { slug, scope? })`: live "is it free?"              |
+| [`useResolve`](docs/API.md#useresolve)                                     | `@vllnt/convex-slugs/react`                | `useResolve(lookupRef, { slug, scope? })`: live holder or `null`                 |
+| [`default` (component config)](docs/API.md#convexconfig)                   | `@vllnt/convex-slugs/convex.config`        | Pass to `app.use(...)`                                                           |
+| [`register`](docs/API.md#register)                                         | `@vllnt/convex-slugs/test`                 | `register(t, name?)`: mount the component in `convex-test`                       |
+| [`ComponentApi`](docs/API.md#componentapi)                                 | `@vllnt/convex-slugs/_generated/component` | Generated type of the mounted component                                          |
 
-Optional, tree-shakeable hooks from `@vllnt/convex-slugs/react` — thin wrappers
-over `useQuery`; `react` is an optional peer dep. Each takes the host's
-re-exported `resolve` query reference.
+## Common tasks
 
-```tsx
-import { useSlugAvailable } from "@vllnt/convex-slugs/react";
-import { api } from "../convex/_generated/api";
+Rename the signed-in user's handle, then serve old URLs with a redirect:
 
-// `available` is undefined while loading, true when free, false when held.
-const { available, resourceRef } = useSlugAvailable(api.handles.lookup, {
-  slug,
+```ts
+// convex/profiles.ts
+import { Slugs } from "@vllnt/convex-slugs";
+import { ConvexError, v } from "convex/values";
+
+import { components } from "./_generated/api";
+import { mutation, query } from "./_generated/server";
+
+const slugs = new Slugs(components.slugs);
+
+export const changeHandle = mutation({
+  args: { handle: v.string() },
+  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { handle }) => {
+    const user = await ctx.auth.getUserIdentity();
+    if (user === null) throw new ConvexError("not signed in");
+    const current = await slugs.slugForResource(ctx, user.subject);
+    if (current === null) return slugs.reserve(ctx, handle, user.subject);
+    return slugs.rename(ctx, current, handle);
+  },
+});
+
+export const profileBySlug = query({
+  args: { slug: v.string() },
+  returns: v.union(
+    v.object({ resourceRef: v.string() }),
+    v.object({ redirectTo: v.string() }),
+    v.null(),
+  ),
+  handler: async (ctx, { slug }) => {
+    const resourceRef = await slugs.resolve(ctx, slug);
+    if (resourceRef !== null) return { resourceRef };
+    const redirectTo = await slugs.redirectFor(ctx, slug);
+    return redirectTo === null ? null : { redirectTo };
+  },
 });
 ```
 
-| Hook                                             | Returns                                                                                         |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `useSlugAvailable(resolveRef, { slug, scope? })` | `{ available, resourceRef }` — `available` `undefined` while loading, `true` free, `false` held |
-| `useResolve(resolveRef, { slug, scope? })`       | `resourceRef \| null \| undefined` (`undefined` while loading)                                  |
+Give each workspace its own article slugs, with a charset, a length cap and
+reserved words. Call this from host code that has already checked the caller
+may publish in the workspace:
 
-Availability is a lookup hint, not a reservation or validation of length,
-pattern, or reserved words. A concurrent claim can win; always check `reserve`'s
-result. The example intentionally exposes public handles in the global scope
-only.
+```ts
+// convex/articles.ts
+import { Slugs } from "@vllnt/convex-slugs";
+import { v } from "convex/values";
 
-## Security
+import { components } from "./_generated/api";
+import { internalMutation } from "./_generated/server";
 
-- **Auth-agnostic** — the host authenticates the caller, decides who may claim a
-  handle, and passes an opaque `resourceRef`.
-- **Management authorization** — before `release` or `rename`, verify ownership
-  in the host. Authentication alone does not authorize changing another
-  subject's slug.
-- **Opaque refs only** — `resourceRef` and `scope` are arbitrary strings; tables
-  are sandboxed (reached only via the client).
-- **Boundary re-guard** — the component re-guards length at the trust boundary
-  even if a caller bypasses the client.
-- **Uniqueness under concurrency** — each `reserve`/`rename` is one Convex
-  mutation (serializable): of simultaneous claims on a slug, one succeeds and
-  the rest get `SLUG_TAKEN`.
+const articles = new Slugs(components.slugs, {
+  defaultScope: "articles",
+  maxLength: 80,
+  pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+  reservedWords: ["new", "edit", "settings"],
+});
 
-See [docs/API.md](docs/API.md).
+export const publish = internalMutation({
+  args: { workspaceId: v.string(), articleId: v.string(), slug: v.string() },
+  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
+  handler: (ctx, { workspaceId, articleId, slug }) =>
+    articles.reserve(ctx, slug, articleId, `articles:${workspaceId}`),
+});
+
+export const unpublish = internalMutation({
+  args: { workspaceId: v.string(), slug: v.string() },
+  returns: v.null(),
+  handler: (ctx, { workspaceId, slug }) =>
+    articles.release(ctx, slug, `articles:${workspaceId}`),
+});
+```
+
+Show whether a handle is free while the user types. The hook takes your own
+public query that returns `string | null`, here `lookup` from the Quick start:
+
+```tsx
+// src/HandleField.tsx
+import { useSlugAvailable } from "@vllnt/convex-slugs/react";
+import { useState } from "react";
+
+import { api } from "../convex/_generated/api";
+
+export function HandleField() {
+  const [handle, setHandle] = useState("");
+  const { available } = useSlugAvailable(api.handles.lookup, { slug: handle });
+  return (
+    <label>
+      Handle
+      <input
+        value={handle}
+        onChange={(event) => {
+          setHandle(event.target.value);
+        }}
+      />
+      {available === false ? " is taken" : null}
+    </label>
+  );
+}
+```
+
+## Errors and fixes
+
+`reserve` and `rename` do not throw for expected rejections. They return
+`{ ok: false, reason }`:
+
+| `reason`         | Cause                                                                                                                                  | Fix                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, or fails `pattern`                                            | Show the rule to the user; for `rename` only `toSlug` is checked                             |
+| `SLUG_RESERVED`  | The normalized slug is in `reservedWords`                                                                                              | Ask for another slug                                                                         |
+| `SLUG_TAKEN`     | The slug is held in the scope (by anyone, including the same `resourceRef`), or `rename` got `fromSlug === toSlug` after normalization | Ask for another slug; for `rename`, skip the call when both names normalize to the same slug |
+| `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                                                                | Read the current slug with `slugForResource` and rename that one                             |
+
+Invalid input throws a `ConvexError` whose `data` is `{ code, message }`. Catch
+it in the host with `error instanceof ConvexError` and read `error.data.code`.
+
+| Code               | Message                                                                                                                                       | Cause                                                                                                                                                                                | Fix                                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`  | `Slugs options: defaultScope must be non-empty; minLength and maxLength must be integers with 0 <= minLength <= maxLength and maxLength >= 1` | `new Slugs(...)` got an empty `defaultScope`, a non-integer or negative `minLength`, a non-integer `maxLength`, or `maxLength` below `max(1, minLength)`                             | Fix the options. A `new Slugs` at module top level throws when Convex loads that file, so every function in it fails |
+| `INVALID_ARGUMENT` | `scope and resourceRef must be non-empty; bounds must be integers with min <= max`                                                            | `reserve`, `release` or `rename` got `scope: ""`, or `reserve` got `resourceRef: ""`; or a direct component call passed `bounds` that are not integers with `minLength <= maxLength` | Pass a non-empty scope (or omit it for `defaultScope`) and a non-empty `resourceRef`                                 |
+
+Arguments of the wrong type are rejected by Convex argument validation before
+the component runs.
+
+## Limits and gotchas
+
+- Slugs are normalized before every write and lookup: Unicode NFC, then
+  `trim()`, then `toLowerCase()` unless `foldCase: false`. `" Ada "` and `"ada"`
+  are the same slug by default. NFC does not merge look-alike characters from
+  different scripts, compatibility forms (NFKC) or zero-width characters; use
+  `pattern` to restrict the alphabet.
+- `minLength` and `maxLength` count UTF-16 code units of the normalized slug
+  (an emoji counts 2). Defaults: `minLength: 1`, `maxLength: 256`,
+  `defaultScope: "global"`, `foldCase: true`, `reservedWords: []`, no
+  `pattern`. An empty slug is always `SLUG_INVALID`, even with `minLength: 0`.
+- `pattern` and `reservedWords` run against the normalized slug, so with
+  `foldCase: true` a pattern of `/^[a-z]+$/` accepts `"ADA"`.
+- `release` is idempotent and always returns `null`: releasing a slug that is
+  not held does nothing and does not tell you so. It does not check who holds
+  the slug.
+- `reserve` does not limit one slug per `resourceRef`; one resource can hold
+  several slugs, and `slugForResource` then returns one of them.
+- Reserving a name that was renamed away deletes its redirect: old links stop
+  redirecting and resolve to the new holder.
+- `resolve` of an old name returns `null` after a rename. Call `redirectFor` to
+  find the live slug, then `resolve` that. Redirect chains are collapsed, so
+  one `redirectFor` call is enough.
+- `useSlugAvailable` and `useResolve` are a hint. They do not check length,
+  `pattern` or reserved words, an empty slug reads as available, and another
+  user can claim the slug before `reserve` runs. Always check `reserve`'s
+  result.
+- Scopes are separate namespaces and are not checked against a list: a wrong
+  scope returns `null` from every query. Changing `foldCase` or `defaultScope`
+  later does not migrate stored rows.
+- Rows that 0.1.0 stored under scope `""` can still be read with `resolve`,
+  `redirectFor` and `slugForResource`, but `reserve`, `release` and `rename`
+  reject `scope: ""` with `INVALID_ARGUMENT`.
+- There is no list, search or history API. The component stores only the
+  current holder of each slug and one redirect per old name.
+
+## Compatibility
+
+- Peer dependency: `convex@^1.45.0`. CI runs the unit tests on the locked convex
+  version (1.51.0), and type-checks and runs the packed package against convex
+  1.45.0.
+- Node.js: convex 1.45 to 1.48 require Node.js 20 or later; convex 1.49 and
+  newer require Node.js 22 or later. ES modules only.
+- `Slugs` runs in Convex queries, mutations and actions: it only calls
+  `ctx.runQuery` and `ctx.runMutation`.
+- React: optional peer `react@>=18`, used only by `@vllnt/convex-slugs/react`.
+  The hooks call `useQuery` from `convex/react`, so they need a
+  `ConvexProvider` above them. The packed package is type-checked and imported
+  with React 18.3.
+- `@vllnt/convex-slugs/test` needs `convex-test`, `vitest`, `vite` and
+  `@edge-runtime/vm`, with the Vitest config shown under Testing.
 
 ## Testing
 
-```bash
-pnpm test           # single run
-pnpm test:coverage  # enforced 100% on covered files
-```
-
-Tests run against the real component runtime via `convex-test`
-(`@edge-runtime/vm`), not mocks.
-
-### Testing your app
-
-`@vllnt/convex-slugs/test` exports `register(t, name = "slugs")` to mount the
-component in a `convex-test` instance. It needs `convex-test` and `vitest` (with
-Vite's `import.meta.glob`) in the consuming app:
+Mount the component in your own `convex-test` suite with `register`. Use the
+Vitest settings `convex-test` recommends (edge runtime, `convex-test` inlined):
 
 ```ts
+// vitest.config.mts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    environment: "edge-runtime",
+    server: { deps: { inline: ["convex-test"] } },
+  },
+});
+```
+
+```ts
+// convex/handles.test.ts
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
 import { register } from "@vllnt/convex-slugs/test";
+import { convexTest } from "convex-test";
+import { expect, test } from "vitest";
+
+import { api } from "./_generated/api";
 import schema from "./schema";
 
-const t = convexTest(schema, import.meta.glob("./**/*.ts"));
-register(t);
+test("a handle can be claimed once, in any case", async () => {
+  const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+  register(t);
+  const ada = t.withIdentity({ subject: "user-ada" });
+  const bob = t.withIdentity({ subject: "user-bob" });
+  expect(await ada.mutation(api.handles.claim, { handle: "Ada" })).toEqual({
+    ok: true,
+  });
+  expect(await bob.mutation(api.handles.claim, { handle: "ADA" })).toEqual({
+    ok: false,
+    reason: "SLUG_TAKEN",
+  });
+  expect(await t.query(api.handles.lookup, { slug: "ada" })).toBe("user-ada");
+});
 ```
+
+`register(t, name)` takes the mount name when you used
+`app.use(slugs, { name })`.
+
+This repository's own tests run on the simulated `convex-test` runtime
+(`pnpm test:coverage`, 100% coverage enforced), including concurrent claims of
+one slug.
+
+## Security
+
+- The component does not authenticate. The host must authorize every call:
+  check that the caller owns a slug before `rename` or `release`, and derive
+  `resourceRef` and `scope` on the server; never accept them from the client.
+- `resolve` returns the `resourceRef`. A public query that forwards it shows
+  that value to every caller, so use refs you are willing to publish.
+- Scopes are namespaces, not access control.
+- The tables are reachable only through the component's functions. The
+  component re-checks length bounds even when called without the client.
+- Each `reserve` and `rename` is one Convex mutation (serializable): of
+  simultaneous claims on one slug, one succeeds and the others get
+  `SLUG_TAKEN`.
+
+Report vulnerabilities as described in
+[SECURITY.md](https://github.com/vllnt/convex-slugs/blob/main/SECURITY.md).
 
 ## Related packages
 
@@ -189,17 +345,22 @@ package.
 See
 [CONTRIBUTING.md](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md).
 
-## Author
+## Links
 
-Built by [bntvllnt](https://github.com/bntvllnt) ·
-[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
-
-If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
+- Docs and changelog: [oss.vllnt.com/packages/convex-slugs](https://oss.vllnt.com/packages/convex-slugs) · [release feed](https://oss.vllnt.com/packages/convex-slugs/rss.xml)
+- All @vllnt packages: [oss.vllnt.com](https://oss.vllnt.com) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)
+- Source and issues: [GitHub](https://github.com/vllnt/convex-slugs) · [issues](https://github.com/vllnt/convex-slugs/issues) · [npm](https://www.npmjs.com/package/@vllnt/convex-slugs)
+- Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)
+- Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)
+- Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
+
+[![npm](https://img.shields.io/npm/v/@vllnt/convex-slugs.svg)](https://www.npmjs.com/package/@vllnt/convex-slugs)
+[![CI](https://github.com/vllnt/convex-slugs/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-slugs/actions/workflows/ci.yml)
 
 ---
 
-Part of vllnt oss: https://oss.vllnt.com
+Part of [vllnt open source](https://oss.vllnt.com) · [Package page](https://oss.vllnt.com/packages/convex-slugs) · [vllnt.com](https://vllnt.com) · Built by [bntvllnt](https://bntvllnt.com)

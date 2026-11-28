@@ -88,12 +88,20 @@ interface RunMutationCtx {
  * Slug validation (length, charset, reserved words) runs here against the
  * resolved {@link SlugsOptions}; the component re-guards length at the trust
  * boundary. An invalid write short-circuits to a typed result with no round-trip.
+ *
+ * @see https://oss.vllnt.com/packages/convex-slugs
  */
 export class Slugs {
   private readonly defaultScope: string;
   private readonly foldCase: boolean;
   private readonly constraints: SlugConstraints;
 
+  /**
+   * @param component - The mounted component, `components.slugs`.
+   * @param options - Scope, case folding and validation rules; see {@link SlugsOptions}.
+   * @throws `ConvexError` with `data.code` `INVALID_OPTIONS` for an empty
+   *   `defaultScope` or invalid length bounds.
+   */
   constructor(
     private readonly component: SlugsComponent,
     options: SlugsOptions = {},
@@ -143,6 +151,11 @@ export class Slugs {
    * Reserve `slug` for `resourceRef`. Returns `{ ok: false, reason }` when the
    * slug is invalid (`SLUG_INVALID`), reserved (`SLUG_RESERVED`), or already held
    * (`SLUG_TAKEN`).
+   *
+   * @param ctx - A mutation or action context.
+   * @param slug - Raw slug; normalized before validation and storage.
+   * @param resourceRef - Opaque host reference that will hold the slug.
+   * @param scope - Namespace; defaults to `defaultScope`.
    */
   reserve(
     ctx: RunMutationCtx,
@@ -163,7 +176,14 @@ export class Slugs {
     });
   }
 
-  /** Release `slug` (idempotent — releasing an unheld slug is a no-op). */
+  /**
+   * Release `slug` (idempotent — releasing an unheld slug is a no-op) and
+   * delete the redirects that point at it.
+   *
+   * @param ctx - A mutation or action context.
+   * @param slug - Raw slug; normalized before lookup.
+   * @param scope - Namespace; defaults to `defaultScope`.
+   */
   release(ctx: RunMutationCtx, slug: string, scope?: string): Promise<null> {
     return ctx.runMutation(this.component.mutations.release, {
       scope: this.scopeOf(scope),
@@ -174,6 +194,13 @@ export class Slugs {
   /**
    * Rename `fromSlug` to `toSlug`, recording a redirect. The `toSlug` is
    * validated; an invalid target short-circuits to `{ ok: false, reason }`.
+   * Returns `SLUG_NOT_FOUND` when `fromSlug` is not held and `SLUG_TAKEN` when
+   * `toSlug` is held or equals `fromSlug`.
+   *
+   * @param ctx - A mutation or action context.
+   * @param fromSlug - The currently held slug.
+   * @param toSlug - The new slug; validated like `reserve`.
+   * @param scope - Namespace; defaults to `defaultScope`.
    */
   rename(
     ctx: RunMutationCtx,
@@ -194,7 +221,13 @@ export class Slugs {
     });
   }
 
-  /** Resolve `slug` to its `resourceRef`, or `null`. */
+  /**
+   * Resolve `slug` to its `resourceRef`, or `null`. Does not follow redirects.
+   *
+   * @param ctx - A query, mutation or action context.
+   * @param slug - Raw slug; normalized before lookup.
+   * @param scope - Namespace; defaults to `defaultScope`.
+   */
   resolve(ctx: RunQueryCtx, slug: string, scope?: string): Promise<string | null> {
     return ctx.runQuery(this.component.queries.resolve, {
       scope: this.scopeOf(scope),
@@ -202,7 +235,14 @@ export class Slugs {
     });
   }
 
-  /** Where a renamed `slug` now points (`toSlug`), or `null`. */
+  /**
+   * Where a renamed `slug` now points (the live slug, chains collapsed), or
+   * `null`.
+   *
+   * @param ctx - A query, mutation or action context.
+   * @param slug - Raw slug; normalized before lookup.
+   * @param scope - Namespace; defaults to `defaultScope`.
+   */
   redirectFor(
     ctx: RunQueryCtx,
     slug: string,
@@ -214,7 +254,13 @@ export class Slugs {
     });
   }
 
-  /** The slug currently held by `resourceRef`, or `null`. */
+  /**
+   * The slug currently held by `resourceRef`, or `null`.
+   *
+   * @param ctx - A query, mutation or action context.
+   * @param resourceRef - Opaque host reference, compared exactly.
+   * @param scope - Namespace; defaults to `defaultScope`.
+   */
   slugForResource(
     ctx: RunQueryCtx,
     resourceRef: string,

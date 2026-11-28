@@ -1,31 +1,64 @@
 # @vllnt/convex-slugs
 
-> Unique slug and handle registry with rename redirects, as a Convex component
+> Convex component for unique slugs, handles and usernames per scope, with rename redirects, a TypeScript client and React hooks.
 
-`@vllnt/convex-slugs` is a publishable Convex component. It targets `convex@^1.45.0`.
-It stores two sandboxed tables - `slugs` (unique per `(scope, slug)`, mapping to an opaque `resourceRef`) and `redirects` (old to new on rename). Uniqueness rides the Convex mutation transaction. The host owns the resource, auth, and meaning; the component owns only the uniqueness + redirect state. Slugs are case-folded by default.
+Install `@vllnt/convex-slugs` (unreleased builds from `main` use the `canary`
+dist-tag). Peer dependency `convex@^1.45.0`; optional `react@>=18` for
+`@vllnt/convex-slugs/react`. Mount it with `app.use(config)` from
+`@vllnt/convex-slugs/convex.config` and call it through
+`new Slugs(components.slugs, options?)` from host mutations and queries.
+Methods: `reserve`, `release`, `rename`, `resolve`, `redirectFor`,
+`slugForResource`. Uniqueness is per `(scope, slug)` and rides the Convex
+mutation transaction. Slugs are normalized with NFC, `trim()` and (by default)
+`toLowerCase()`. `rename` records an old -> new redirect and collapses chains.
+`reserve` and `rename` return `{ ok: false, reason }` (`SLUG_INVALID`,
+`SLUG_RESERVED`, `SLUG_TAKEN`, `SLUG_NOT_FOUND`) instead of throwing. Invalid
+input throws `ConvexError` with `data.code` `INVALID_OPTIONS` or
+`INVALID_ARGUMENT`. Defaults: scope `"global"`, `minLength` 1, `maxLength` 256.
+The host owns auth and the meaning of the opaque `resourceRef`. React hooks
+`useSlugAvailable` and `useResolve` take the host's own public query.
 
-For coding agents: the docs are bundled in the package at `node_modules/@vllnt/convex-slugs/docs/` and match the installed version. Read them before writing code. `README.md`, `CHANGELOG.md` and this file sit at the package root; `src/` and `dist/` hold the source and type declarations of the same version.
+## When to use
+
+- Use it when each public name (article slug, `@handle`, username, workspace
+  slug) must be unique inside a scope, even under concurrent claims.
+- Use it when renaming must keep old URLs working through a redirect.
+- Use it when you need lookups both ways: slug to resource and resource to slug.
+- Do not use it when the key must stay secret (share links, magic links,
+  invites): a slug is public and anyone can resolve it. Use
+  [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens).
+
+## For coding agents
+
+The docs are bundled in the package at `node_modules/@vllnt/convex-slugs/docs/`
+and match the installed version. Read them, and the shipped `src/`, before
+writing code. The links below to `./` paths are files inside the installed package.
 
 ## Docs
 
-- [README](./README.md): Project overview, installation, usage examples
-- [API Reference](./docs/API.md): Public exports, class methods, return shapes, input validation
+- [README](./README.md): Install, quick start, common tasks, limits
+- [API Reference](./docs/API.md): Every export, signature, return shape and validation rule
+- [Errors and fixes](./README.md#errors-and-fixes): Every reason and error code, its cause and the fix
 - [Changelog](./CHANGELOG.md): Version history and release notes
-- [Contributing](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md): Development setup, validation commands, release workflow
+- [Contributing](https://github.com/vllnt/convex-slugs/blob/main/CONTRIBUTING.md): Development setup, validation commands, release workflow (repository only)
 
 ## Examples
 
 - [Example component wrapper](https://github.com/vllnt/convex-slugs/blob/main/example/convex/example.ts): Host-app wrapper functions
-- [Example tests](https://github.com/vllnt/convex-slugs/blob/main/example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
-
-## Ecosystem
-
-- [vllnt oss](https://oss.vllnt.com/llms.txt): Index of vllnt open-source packages
+- [Example tests](https://github.com/vllnt/convex-slugs/blob/main/example/convex/example.test.ts): Simulated usage coverage with `convex-test`
 
 ## Optional
 
-- [AGENTS](https://github.com/vllnt/convex-slugs/blob/main/AGENTS.md): Agent instructions for contributors to this repository
+- [AGENTS](https://github.com/vllnt/convex-slugs/blob/main/AGENTS.md): Contributor instructions for working in this repository (repository only)
 - [Security Policy](https://github.com/vllnt/convex-slugs/blob/main/SECURITY.md): Vulnerability reporting policy
 - [Code of Conduct](https://github.com/vllnt/convex-slugs/blob/main/CODE_OF_CONDUCT.md): Community participation guidelines
 - [License](./LICENSE): MIT license
+
+## Ecosystem
+
+- [Package page](https://oss.vllnt.com/packages/convex-slugs)
+- [Release feed](https://oss.vllnt.com/packages/convex-slugs/rss.xml)
+- [All @vllnt packages](https://oss.vllnt.com/llms.txt)
+- [Search vllnt packages and docs](https://index.vllnt.com)
+- [vllnt](https://vllnt.com/llms.txt)
+- [Author](https://bntvllnt.com)

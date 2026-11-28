@@ -7,8 +7,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import process from "node:process";
+
+import {
+  checkDocumentation,
+  convexHost,
+  writeHost,
+} from "./check-documentation.mjs";
 
 // Files the published package must contain; agents read the docs from node_modules.
 const REQUIRED = [
@@ -68,6 +74,8 @@ try {
     "convex-test@0.0.56",
     "vite@8.2.2",
     "@types/node@22.20.2",
+    "vitest@5.1.1",
+    "@edge-runtime/vm@5.0.0",
     // Lowest supported React major (18), for the optional ./react entry.
     "react@18.3.1",
     "@types/react@18.3.31",
@@ -75,21 +83,39 @@ try {
 
   const installed = join(temporary, "node_modules", metadata.name);
   const missing = REQUIRED.filter((file) => !existsSync(join(installed, file)));
-  // Relative llms.txt links must resolve inside the installed package.
-  const llms = join(installed, "llms.txt");
-  const index = existsSync(llms) ? readFileSync(llms, "utf8") : "";
-  const broken = [...index.matchAll(/\]\(([^)]+)\)/g)]
-    .map((match) => String(match[1]))
-    .filter((target) => !/^(?:https?:\/\/|#)/.test(target))
-    .filter(
-      (target) =>
-        !existsSync(join(dirname(llms), target.split("#")[0] ?? target)),
-    );
-  if (missing.length > 0 || broken.length > 0)
-    throw new Error(
-      `package contents: missing [${missing.join(", ")}], broken llms.txt links [${broken.join(", ")}]`,
-    );
+  if (missing.length > 0)
+    throw new Error(`package contents: missing [${missing.join(", ")}]`);
   console.log(`OK    ${REQUIRED.length} required files in the package`);
+
+  // Docs contract on what consumers receive, then the README examples
+  // type-checked against the built package in a stub Convex host.
+  const examples = checkDocumentation(installed, temporary);
+  console.log("OK    documentation contract on the installed package");
+  const hostFiles = writeHost(
+    temporary,
+    convexHost(installed, examples),
+    examples,
+  );
+  run("pnpm", [
+    "exec",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--module",
+    "ESNext",
+    "--moduleResolution",
+    "Bundler",
+    "--target",
+    "ES2022",
+    "--jsx",
+    "react-jsx",
+    "--types",
+    "vite/client,node",
+    ...hostFiles,
+  ]);
+  console.log(`OK    ${String(examples.length)} README examples type-check`);
+  // The README's own vitest.config.mts runs its test example.
+  run("pnpm", ["exec", "vitest", "run"]);
 
   writeFileSync(
     join(temporary, "consumer.ts"),

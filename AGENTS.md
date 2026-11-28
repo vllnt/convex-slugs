@@ -78,6 +78,11 @@ src/
 | `llms.txt` | `convex` peer dep range changes; new `## Optional` entries; run `pnpm generate:llms` to check its local links |
 | `CHANGELOG.md` | Every release |
 
+`pnpm lint` (`check:docs`) and `pnpm test:package` run the docs contract in
+`scripts/check-documentation.mjs`: fixed README sections, every export and error
+code documented, README examples type-checked against the built package.
+`pnpm check:links` checks external links (not in CI).
+
 ## Conventions
 
 - Mutations in `mutations.ts`, queries in `queries.ts` (enforced by `@vllnt/eslint-config/convex`).

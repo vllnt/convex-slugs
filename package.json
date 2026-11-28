@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-slugs",
   "version": "0.2.0",
-  "description": "Unique slug and handle registry with rename redirects, as a Convex component",
+  "description": "Convex component for unique slugs, handles and usernames per scope, with rename redirects, a TypeScript client and React hooks.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.8",
@@ -58,6 +58,7 @@
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test:coverage && pnpm typecheck && pnpm generate:llms",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
     "check:docs": "node scripts/test-check-documentation.mjs && node scripts/check-documentation.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "codegen": "pnpm convex codegen --component-dir ./src/component"
   },
   "peerDependencies": {
@@ -110,11 +111,15 @@
   "keywords": [
     "convex",
     "convex-component",
-    "slugs",
+    "typescript",
     "slug",
+    "slugs",
     "handle",
     "username",
-    "redirect"
+    "unique",
+    "redirect",
+    "permalink",
+    "react"
   ],
   "peerDependenciesMeta": {
     "react": {

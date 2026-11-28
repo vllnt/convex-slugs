@@ -387,3 +387,26 @@ describe("slugs — redirect scope isolation", () => {
     );
   });
 });
+
+describe("slugs — behaviour the README documents", () => {
+  test("a host sees the component's ConvexError code", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.example.release, { slug: "a", scope: "" }),
+    ).rejects.toMatchObject({ data: { code: "INVALID_ARGUMENT" } });
+  });
+
+  test("queries with an empty scope or slug return null instead of throwing", async () => {
+    const t = setup();
+    expect(await t.query(api.example.resolve, { slug: "a", scope: "" })).toBeNull();
+    expect(await t.query(api.example.resolve, { slug: "" })).toBeNull();
+  });
+
+  test("the same resourceRef reserving its own slug again gets SLUG_TAKEN", async () => {
+    const t = setup();
+    await t.mutation(api.example.reserve, { slug: "mine", resourceRef: "r1" });
+    expect(
+      await t.mutation(api.example.reserve, { slug: "mine", resourceRef: "r1" }),
+    ).toEqual({ ok: false, reason: "SLUG_TAKEN" });
+  });
+});
