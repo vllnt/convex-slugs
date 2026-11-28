@@ -12,7 +12,8 @@
 | `@vllnt/convex-slugs/test`                            | `register(t, name = "slugs")` for `convex-test` (TypeScript source)      |
 | `@vllnt/convex-slugs/_generated/component` (or `.js`) | type `ComponentApi`                                                      |
 
-`slug`, `resourceRef` and `scope` are opaque host strings. Every method's
+`resourceRef` and `scope` are opaque host strings; slugs are normalized (see
+[Normalization](#normalization)). Every method's
 `scope` defaults to the client's `defaultScope`. `resourceRef` is stored and
 returned as given; the component never reads its meaning.
 
@@ -60,8 +61,10 @@ Claims `slug` for `resourceRef`. Returns `{ ok: true }`, or `{ ok: false, reason
 with `SLUG_INVALID`, `SLUG_RESERVED` or `SLUG_TAKEN`. `SLUG_TAKEN` is returned
 whenever the slug is held in the scope, also when the same `resourceRef` holds
 it. Reserving a slug that was renamed away deletes the redirect that started at
-it. Throws `INVALID_ARGUMENT` for `scope: ""` or `resourceRef: ""`. One
-`resourceRef` may hold several slugs.
+it. Throws `INVALID_ARGUMENT` for `scope: ""` or `resourceRef: ""`, unless the
+slug already failed the client checks: then it returns `SLUG_INVALID` (or
+`SLUG_RESERVED`) without calling the component. One `resourceRef` may hold
+several slugs.
 
 ### `release`
 
@@ -164,7 +167,8 @@ interface SlugWriteResult {
 
 `@vllnt/convex-slugs/react` wraps `useQuery` from `convex/react`. Each hook
 takes the host's own public query reference with args `{ slug, scope? }` (a
-query that takes only `{ slug }` also fits) and return type `string | null`,
+query that takes only `{ slug }` also fits; then pass `scope` only if your query
+accepts it, because Convex rejects unknown args at runtime) and return type `string | null`,
 usually a query that returns `slugs.resolve(...)`. The component's own queries
 are internal and cannot be called from a browser. The hooks need a
 `ConvexProvider`.
@@ -200,7 +204,7 @@ definition, named `slugs`. Mount it with `app.use(config)`, or
 ### `register`
 
 ```ts
-register(t: TestConvex<SchemaDefinition<GenericSchema, boolean>>, name?: string): void
+register<TSchema extends GenericSchema>(t: TestConvex<SchemaDefinition<TSchema, boolean>>, name = "slugs"): void
 ```
 
 From `@vllnt/convex-slugs/test`. Mounts the component in a `convex-test`
@@ -251,7 +255,8 @@ normalized the same way, so `reservedWords: ["Admin"]` blocks `admin`.
   one slug. It does not apply compatibility folding (NFKC), confusable
   detection or zero-width-character stripping; use `pattern` to restrict the
   alphabet.
-- Lengths count UTF-16 code units of the normalized slug (an emoji counts 2).
+- Lengths count UTF-16 code units of the normalized slug (a single emoji such
+  as 😀 counts 2; flags and joined emoji count more).
 - `toLowerCase()` is not full Unicode case folding: `"STRASSE"` and `"straße"`
   stay different slugs.
 

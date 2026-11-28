@@ -396,6 +396,16 @@ describe("slugs — behaviour the README documents", () => {
     ).rejects.toMatchObject({ data: { code: "INVALID_ARGUMENT" } });
   });
 
+  test("a slug failing the client checks returns SLUG_INVALID before the empty scope is seen", async () => {
+    const t = setup();
+    expect(
+      await t.mutation(api.example.reserve, { slug: " ", resourceRef: "r", scope: "" }),
+    ).toEqual({ ok: false, reason: "SLUG_INVALID" });
+    await expect(
+      t.mutation(api.example.reserve, { slug: "ok", resourceRef: "r", scope: "" }),
+    ).rejects.toMatchObject({ data: { code: "INVALID_ARGUMENT" } });
+  });
+
   test("queries with an empty scope or slug return null instead of throwing", async () => {
     const t = setup();
     expect(await t.query(api.example.resolve, { slug: "a", scope: "" })).toBeNull();

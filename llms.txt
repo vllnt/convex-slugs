@@ -25,7 +25,7 @@ The host owns auth and the meaning of the opaque `resourceRef`. React hooks
 - Use it when renaming must keep old URLs working through a redirect.
 - Use it when you need lookups both ways: slug to resource and resource to slug.
 - Do not use it when the key must stay secret (share links, magic links,
-  invites): a slug is public and anyone can resolve it. Use
+  invites): a slug is meant to be public (it appears in URLs). Use
   [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens).
 
 ## For coding agents

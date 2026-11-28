@@ -15,7 +15,7 @@ before writing code against this package.
 - Use it when renaming must keep old URLs working through a redirect.
 - Use it when you need lookups both ways: slug to resource and resource to slug.
 - Do not use it when the key must stay secret (share links, magic links,
-  invites): a slug is public and anyone can resolve it. Use
+  invites): a slug is meant to be public (it appears in URLs). Use
   [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens).
 
 ## Install
@@ -65,29 +65,30 @@ export const lookup = query({
 
 Run `npx convex dev` once to generate `components.slugs`. The component never
 reads auth: the host picks the `resourceRef` (here the user's `subject`) and
-decides who may claim, rename or release a slug.
+decides who may claim, rename or release a slug. `lookup` is a public query, so
+every caller sees the `resourceRef` it returns; see [Security](#security).
 
 ## API
 
 Full reference: [docs/API.md](docs/API.md).
 
-| Export                                                                     | Import from                                | What it does                                                                     |
-| -------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`Slugs`](docs/API.md#slugs)                                               | `@vllnt/convex-slugs`                      | Host client: `new Slugs(components.slugs, options?)`                             |
-| [`reserve(ctx, slug, resourceRef, scope?)`](docs/API.md#reserve)           | `Slugs` method, mutation                   | Claim a free slug; returns `{ ok, reason? }`                                     |
-| [`release(ctx, slug, scope?)`](docs/API.md#release)                        | `Slugs` method, mutation                   | Free a slug and the redirects pointing at it; returns `null`                     |
-| [`rename(ctx, fromSlug, toSlug, scope?)`](docs/API.md#rename)              | `Slugs` method, mutation                   | Move a held slug and record `fromSlug` -> `toSlug`                               |
-| [`resolve(ctx, slug, scope?)`](docs/API.md#resolve)                        | `Slugs` method, query                      | The `resourceRef` holding `slug`, or `null`                                      |
-| [`redirectFor(ctx, slug, scope?)`](docs/API.md#redirectfor)                | `Slugs` method, query                      | The live slug a renamed-away `slug` points to, or `null`                         |
-| [`slugForResource(ctx, resourceRef, scope?)`](docs/API.md#slugforresource) | `Slugs` method, query                      | The slug held by `resourceRef`, or `null`                                        |
-| [`SlugsComponent`](docs/API.md#slugscomponent)                             | `@vllnt/convex-slugs` (type)               | Type of `components.slugs`                                                       |
-| [`SlugsOptions`](docs/API.md#slugsoptions)                                 | `@vllnt/convex-slugs` (type)               | `{ defaultScope?, foldCase?, minLength?, maxLength?, pattern?, reservedWords? }` |
-| [`SlugWriteResult`](docs/API.md#slugwriteresult)                           | `@vllnt/convex-slugs` (type)               | Result of `reserve` and `rename`                                                 |
-| [`useSlugAvailable`](docs/API.md#useslugavailable)                         | `@vllnt/convex-slugs/react`                | `useSlugAvailable(lookupRef, { slug, scope? })`: live "is it free?"              |
-| [`useResolve`](docs/API.md#useresolve)                                     | `@vllnt/convex-slugs/react`                | `useResolve(lookupRef, { slug, scope? })`: live holder or `null`                 |
-| [`default` (component config)](docs/API.md#convexconfig)                   | `@vllnt/convex-slugs/convex.config`        | Pass to `app.use(...)`                                                           |
-| [`register`](docs/API.md#register)                                         | `@vllnt/convex-slugs/test`                 | `register(t, name?)`: mount the component in `convex-test`                       |
-| [`ComponentApi`](docs/API.md#componentapi)                                 | `@vllnt/convex-slugs/_generated/component` | Generated type of the mounted component                                          |
+| Export                                                                     | Import from                                | What it does                                                                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| [`Slugs`](docs/API.md#slugs)                                               | `@vllnt/convex-slugs`                      | Host client: `new Slugs(components.slugs, options?)`                                                            |
+| [`reserve(ctx, slug, resourceRef, scope?)`](docs/API.md#reserve)           | `Slugs` method, mutation                   | Claim a free slug; returns `{ ok, reason? }`                                                                    |
+| [`release(ctx, slug, scope?)`](docs/API.md#release)                        | `Slugs` method, mutation                   | Free a slug and the redirects pointing at it; returns `null`                                                    |
+| [`rename(ctx, fromSlug, toSlug, scope?)`](docs/API.md#rename)              | `Slugs` method, mutation                   | Move a held slug and record `fromSlug` -> `toSlug`                                                              |
+| [`resolve(ctx, slug, scope?)`](docs/API.md#resolve)                        | `Slugs` method, query                      | The `resourceRef` holding `slug`, or `null`                                                                     |
+| [`redirectFor(ctx, slug, scope?)`](docs/API.md#redirectfor)                | `Slugs` method, query                      | The live slug a renamed-away `slug` points to, or `null`                                                        |
+| [`slugForResource(ctx, resourceRef, scope?)`](docs/API.md#slugforresource) | `Slugs` method, query                      | The slug held by `resourceRef`, or `null`                                                                       |
+| [`SlugsComponent`](docs/API.md#slugscomponent)                             | `@vllnt/convex-slugs` (type)               | Type of `components.slugs`                                                                                      |
+| [`SlugsOptions`](docs/API.md#slugsoptions)                                 | `@vllnt/convex-slugs` (type)               | `{ defaultScope?, foldCase?, minLength?, maxLength?, pattern?, reservedWords? }`                                |
+| [`SlugWriteResult`](docs/API.md#slugwriteresult)                           | `@vllnt/convex-slugs` (type)               | Result of `reserve` and `rename`                                                                                |
+| [`useSlugAvailable`](docs/API.md#useslugavailable)                         | `@vllnt/convex-slugs/react`                | `useSlugAvailable(lookupRef, { slug, scope? })`: live "is it free?"; pass `scope` only if your query accepts it |
+| [`useResolve`](docs/API.md#useresolve)                                     | `@vllnt/convex-slugs/react`                | `useResolve(lookupRef, { slug, scope? })`: live holder or `null`; pass `scope` only if your query accepts it    |
+| [`default` (component config)](docs/API.md#convexconfig)                   | `@vllnt/convex-slugs/convex.config`        | Pass to `app.use(...)`                                                                                          |
+| [`register`](docs/API.md#register)                                         | `@vllnt/convex-slugs/test`                 | `register(t, name?)`: mount the component in `convex-test`                                                      |
+| [`ComponentApi`](docs/API.md#componentapi)                                 | `@vllnt/convex-slugs/_generated/component` | Generated type of the mounted component                                                                         |
 
 ## Common tasks
 
@@ -205,8 +206,10 @@ export function HandleField() {
 | `SLUG_TAKEN`     | The slug is held in the scope (by anyone, including the same `resourceRef`), or `rename` got `fromSlug === toSlug` after normalization | Ask for another slug; for `rename`, skip the call when both names normalize to the same slug |
 | `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                                                                | Read the current slug with `slugForResource` and rename that one                             |
 
-Invalid input throws a `ConvexError` whose `data` is `{ code, message }`. Catch
-it in the host with `error instanceof ConvexError` and read `error.data.code`.
+Invalid input throws a `ConvexError` whose `data` is `{ code, message }`; the
+host sees the code as `error.data.code`. `reserve` and `rename` check the slug in
+the client first, so a slug that fails those checks returns `SLUG_INVALID` (or
+`SLUG_RESERVED`) before the component sees an empty scope.
 
 | Code               | Message                                                                                                                                       | Cause                                                                                                                                                                                | Fix                                                                                                                  |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
@@ -224,7 +227,8 @@ the component runs.
   different scripts, compatibility forms (NFKC) or zero-width characters; use
   `pattern` to restrict the alphabet.
 - `minLength` and `maxLength` count UTF-16 code units of the normalized slug
-  (an emoji counts 2). Defaults: `minLength: 1`, `maxLength: 256`,
+  (a single emoji such as 😀 counts 2; flags and joined emoji count more).
+  Defaults: `minLength: 1`, `maxLength: 256`,
   `defaultScope: "global"`, `foldCase: true`, `reservedWords: []`, no
   `pattern`. An empty slug is always `SLUG_INVALID`, even with `minLength: 0`.
 - `pattern` and `reservedWords` run against the normalized slug, so with
@@ -326,8 +330,11 @@ one slug.
 - `resolve` returns the `resourceRef`. A public query that forwards it shows
   that value to every caller, so use refs you are willing to publish.
 - Scopes are namespaces, not access control.
-- The tables are reachable only through the component's functions. The
-  component re-checks length bounds even when called without the client.
+- The tables are reachable only through the component's functions, and those
+  are callable only from the host's own functions. A host that calls
+  `components.slugs` directly instead of through `Slugs` skips normalization,
+  `pattern` and reserved words; the component then only rejects an empty slug
+  and one outside the `bounds` the caller passes.
 - Each `reserve` and `rename` is one Convex mutation (serializable): of
   simultaneous claims on one slug, one succeeds and the others get
   `SLUG_TAKEN`.

@@ -60,10 +60,11 @@ src/
   multi-hop traversal, at most one redirect row per `(scope, fromSlug)`.
 - **`release` deletes inbound redirects.** Releasing a slug removes all `redirects` rows whose
   `toSlug` equals the released slug, preventing `redirectFor` from pointing at a dead target.
-- **NFC normalization prevents homoglyph collisions.** `normalizeSlug` applies
-  `String.prototype.normalize("NFC")` before trimming and case-folding; visually-identical slugs
-  with different Unicode compositions (precomposed vs. combining-character forms) collide as
-  expected.
+- **NFC normalization unifies canonically equivalent spellings.** `normalizeSlug` applies
+  `String.prototype.normalize("NFC")` before trimming and case-folding, so precomposed and
+  combining-character forms of the same letter collide. It does not merge look-alike
+  characters (homoglyphs), compatibility forms (NFKC) or zero-width characters; hosts restrict
+  the alphabet with `pattern`.
 - **Explicit self-rename guard.** `rename(fromSlug, toSlug)` where `fromSlug === toSlug` is
   rejected with `SLUG_TAKEN` before any DB read — avoids a spurious `SLUG_NOT_FOUND` path.
 - **Host owns `resourceRef`.** It is stored and returned as an opaque string; the component never
