@@ -53,7 +53,7 @@ const releaseAgeBlocks = readFileSync("pnpm-workspace.yaml", "utf8").match(
 if (!releaseAgeBlocks?.some((block) => block.startsWith("minimumReleaseAge:")))
   throw new Error("pnpm-workspace.yaml: minimumReleaseAge is missing");
 const releaseAge = releaseAgeBlocks.join("");
-const tarball =`${metadata.name.replace("@", "").replace("/", "-")}-${metadata.version}.tgz`;
+const tarball = `${metadata.name.replace("@", "").replace("/", "-")}-${metadata.version}.tgz`;
 const temporary = mkdtempSync(join(tmpdir(), "slugs-consumer-"));
 /** @param {string} command @param {string[]} arguments_ @param {string} [cwd] */
 const run = (command, arguments_, cwd = temporary) =>

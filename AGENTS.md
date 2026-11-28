@@ -10,8 +10,8 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 
 That guidelines file is generated and gitignored, so a fresh clone lacks it: the
 `npx convex ai-files install` command above creates it (no login needed). It also writes
-`CLAUDE.md` and `.claude/`, which this repo forbids, so delete them afterwards. If you cannot run
-it, use the Convex docs at https://docs.convex.dev.
+`CLAUDE.md` and `.claude/skills/`, which this repo forbids, so delete only those two afterwards.
+If you cannot run it, use the Convex docs at https://docs.convex.dev.
 
 # @vllnt/convex-slugs
 
