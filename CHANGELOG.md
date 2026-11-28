@@ -47,6 +47,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file is missing from the packed tarball.
 - `package.json` `homepage` points to
   https://oss.vllnt.com/packages/convex-slugs.
+- Docs: README "Related packages" lists only packages this one works with in
+  code, which is none; the hint to use `@vllnt/convex-tokens` for secret keys
+  moved to the intro.
+- Release flow: canary and stable publishes run `pnpm test:package` first; it
+  type-checks and imports every entry point, including `./react` with React 18.
 
 ## [0.1.0] - 2026-09-01
 
