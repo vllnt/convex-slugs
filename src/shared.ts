@@ -28,7 +28,7 @@ export type SlugReason =
 export interface SlugConstraints {
   minLength: number;
   maxLength: number;
-  pattern?: RegExp;
+  pattern?: RegExp | undefined;
   reservedWords: ReadonlyArray<string>;
 }
 
