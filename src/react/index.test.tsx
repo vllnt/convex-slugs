@@ -1,15 +1,16 @@
-// @vitest-environment jsdom
+// @vitest-environment node
 
 /**
  * Unit tests for the optional React front-tooling hooks. `convex/react`'s
  * `useQuery` is mocked so the hooks are exercised in isolation — no live Convex
- * client. Runs under jsdom (per-file pragma above) while the global vitest env
- * stays edge-runtime for the backend suite.
+ * client. Each hook runs inside a real React render (`react-dom/server`), so no
+ * DOM is needed; the global vitest env stays edge-runtime for the backend suite.
  */
 
-import { renderHook } from "@testing-library/react";
 import type { FunctionReference } from "convex/server";
 import { useQuery } from "convex/react";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useResolve, useSlugAvailable } from "./index.js";
@@ -19,6 +20,18 @@ vi.mock("convex/react", () => ({
 }));
 
 const mockedUseQuery = vi.mocked(useQuery);
+
+/** Renders `hook` once inside a React component and returns its value. */
+function renderHook<T>(hook: () => T): { result: { current: T } } {
+  const rendered: { result?: { current: T } } = {};
+  function Probe(): null {
+    rendered.result = { current: hook() };
+    return null;
+  }
+  renderToStaticMarkup(createElement(Probe));
+  if (rendered.result === undefined) throw new Error("the hook did not run");
+  return { result: rendered.result };
+}
 
 // A stand-in for the host's re-exported `resolve` query reference. The hooks
 // only forward it to `useQuery`, so an opaque cast is sufficient for the test.
