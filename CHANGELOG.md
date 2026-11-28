@@ -88,7 +88,7 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
   is no version-update bot (`renovate.json` is gone), so dependency updates are
   a manual pass under the 7-day rule; the React hook tests render through
   `react-dom/server`, which drops `@testing-library/react` and `jsdom` from the
-  dev dependencies.
+  dev dependencies; a client test now covers the length bounds.
 
 ## [0.1.0] - 2026-09-01
 
