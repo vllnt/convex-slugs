@@ -312,7 +312,9 @@ describe("slugs component — 1024 UTF-16 code unit cap on writes", () => {
     });
     expect(await t.query(api.queries.resolve, { scope, slug: "a" })).toBe("r");
     expect(await move(t, { fromSlug: "a", toSlug: at })).toEqual({ ok: true });
-    expect(await t.query(api.queries.redirectFor, { scope, slug: "a" })).toBe(at);
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "a" })).toBe(
+      at,
+    );
   });
 
   test("reserve and rename: a 1024-unit scope passes, 1025 throws INVALID_ARGUMENT", async () => {
@@ -436,9 +438,9 @@ describe("slugs component — rows stored over the cap by an older version", () 
     expect(
       await t.query(api.queries.resolve, { scope: longScope, slug: "c" }),
     ).toBe("c");
-    expect(
-      await t.query(api.queries.redirectFor, { scope, slug: "old" }),
-    ).toBe(longSlug);
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "old" })).toBe(
+      longSlug,
+    );
   });
 
   test("release removes them and the redirects that point at them", async () => {
@@ -474,9 +476,9 @@ describe("slugs component — rows stored over the cap by an older version", () 
     expect(
       await t.query(api.queries.redirectFor, { scope, slug: longSlug }),
     ).toBe("short");
-    expect(
-      await t.query(api.queries.redirectFor, { scope, slug: "old" }),
-    ).toBe("short");
+    expect(await t.query(api.queries.redirectFor, { scope, slug: "old" })).toBe(
+      "short",
+    );
   });
 
   test("a row with an over-cap resourceRef can be renamed and keeps its ref", async () => {

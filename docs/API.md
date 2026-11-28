@@ -228,12 +228,12 @@ the mounted component, the same shape as `SlugsComponent`.
 
 `reserve` and `rename` return `{ ok: false, reason }` instead of throwing:
 
-| Reason           | When                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------- |
+| Reason           | When                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLUG_INVALID`   | After normalization the slug is empty, outside `minLength`..`maxLength`, fails `pattern`, or is over 1024 UTF-16 code units (component cap) |
-| `SLUG_RESERVED`  | The normalized slug is in the normalized `reservedWords`                                    |
-| `SLUG_TAKEN`     | The slug is held in the scope, or `rename` got `fromSlug === toSlug` after normalization    |
-| `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                     |
+| `SLUG_RESERVED`  | The normalized slug is in the normalized `reservedWords`                                                                                    |
+| `SLUG_TAKEN`     | The slug is held in the scope, or `rename` got `fromSlug === toSlug` after normalization                                                    |
+| `SLUG_NOT_FOUND` | `rename` got a `fromSlug` that is not held in the scope                                                                                     |
 
 Causes and fixes are in the README's
 [Errors and fixes](../README.md#errors-and-fixes) table.
@@ -242,9 +242,9 @@ Causes and fixes are in the README's
 
 Invalid input throws a `ConvexError` whose `data` is `{ code, message }`:
 
-| Code               | Thrown by                                          | When                                                                                                                     |
-| ------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `INVALID_OPTIONS`  | `new Slugs(...)`                                   | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `minLength >= 0` and `maxLength >= max(1, minLength)` |
+| Code               | Thrown by                                          | When                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`  | `new Slugs(...)`                                   | Empty `defaultScope`, or `minLength`/`maxLength` not integers with `minLength >= 0` and `maxLength >= max(1, minLength)`                                                                      |
 | `INVALID_ARGUMENT` | component mutations `reserve`, `release`, `rename` | Empty `scope`, empty `resourceRef` (`reserve`), a `scope` or `resourceRef` over 1024 UTF-16 code units (`reserve`, `rename`), or `bounds` that are not integers with `minLength <= maxLength` |
 
 The client always sends integer bounds from its validated options, so through
@@ -259,11 +259,11 @@ rejected by Convex argument validation.
 (`string.length`), the same counting as `minLength` and `maxLength`. The cap
 holds whatever `maxLength` or `bounds` say:
 
-| Input                                    | Over 1024 code units                |
-| ---------------------------------------- | ----------------------------------- |
-| `slug` (`reserve`), `toSlug` (`rename`)  | returns `SLUG_INVALID`              |
-| `scope` (`reserve`, `rename`)            | throws `INVALID_ARGUMENT`           |
-| `resourceRef` (`reserve`)                | throws `INVALID_ARGUMENT`           |
+| Input                                   | Over 1024 code units      |
+| --------------------------------------- | ------------------------- |
+| `slug` (`reserve`), `toSlug` (`rename`) | returns `SLUG_INVALID`    |
+| `scope` (`reserve`, `rename`)           | throws `INVALID_ARGUMENT` |
+| `resourceRef` (`reserve`)               | throws `INVALID_ARGUMENT` |
 
 A value of exactly 1024 passes. 😀 counts 2, so 512 😀 pass and 513 are
 rejected, although that is only 513 code points. `release`, `fromSlug` and the
