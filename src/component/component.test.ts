@@ -1,3 +1,4 @@
+import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api.js";
@@ -381,10 +382,13 @@ describe("slugs component — 1024 UTF-16 code unit cap on writes", () => {
 
   test("the client accepts maxLength over 1024; the component still caps the slug", async () => {
     const t = setup();
+    // Drive the real client against the convex-test component.
     const component = api as unknown as SlugsComponent;
+    type Reserve = typeof api.mutations.reserve;
     const runner = {
-      runMutation: (ref: never, args: never) => t.mutation(ref, args),
-    };
+      runMutation: (ref: unknown, args: unknown) =>
+        t.mutation(ref as Reserve, args as FunctionArgs<Reserve>),
+    } as unknown as Parameters<Slugs["reserve"]>[0];
     const slugs = new Slugs(component, { maxLength: 2048 });
     expect(await slugs.reserve(runner, over, "r")).toEqual({
       ok: false,
