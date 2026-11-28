@@ -1,8 +1,8 @@
 # @vllnt/convex-slugs
 
-![Slug Registry — @vllnt/convex-slugs](https://raw.githubusercontent.com/vllnt/convex-slugs/main/.github/assets/thumbnail.png)
-
 Convex component for unique slugs, handles and usernames per scope, with rename redirects, a TypeScript client and React hooks.
+
+![Slug Registry — @vllnt/convex-slugs](https://raw.githubusercontent.com/vllnt/convex-slugs/main/.github/assets/thumbnail.png)
 
 ## For coding agents
 
