@@ -74,13 +74,11 @@ Inputs that 0.1.0 accepted now throw a `ConvexError`:
 - `package.json` `description` is now "Convex component for unique slugs,
   handles and usernames per scope, with rename redirects, a TypeScript client
   and React hooks."; `keywords` now list 11 search terms.
-- Release flow: the 7-day release-age gate moved from the `package.json`
-  `pnpm` field, which pnpm 10 ignores, to `pnpm-workspace.yaml`, so installs
-  refuse versions newer than 7 days (`@vllnt/*` excluded). Renovate waits 7
-  days too.
-- CI: the Lint job runs `scripts/test-check-package-contents.sh`, which now
-  also checks that `.test.mts` and `.test.cts` files are kept out of the
-  tarball.
+- Release flow: the 7-day release-age gate moved from the `package.json` `pnpm`
+  field, which pnpm 10 ignores, to `pnpm-workspace.yaml`, so installs refuse
+  versions newer than 7 days (`@vllnt/*` excluded). Renovate waits 7 days too.
+- CI: the Lint job runs `scripts/test-check-package-contents.sh`, which now also
+  checks that `.test.mts` and `.test.cts` files are kept out of the tarball.
 
 ## [0.1.0] - 2026-09-01
 
