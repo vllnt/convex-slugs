@@ -31,7 +31,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-Input that 0.1.0 accepted is now rejected. What to do:
+The first four entries reject input that 0.1.0 accepted; each says what to do:
 
 - `new Slugs(...)` throws a `ConvexError` with code `INVALID_OPTIONS` for an
   empty `defaultScope`, a `minLength` or `maxLength` that is not an integer
