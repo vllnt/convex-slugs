@@ -68,7 +68,7 @@ try {
     "convex-test@0.0.56",
     "vite@8.2.2",
     "@types/node@22.20.2",
-    // Lowest supported React peer, for the optional ./react entry.
+    // Lowest supported React major (18), for the optional ./react entry.
     "react@18.3.1",
     "@types/react@18.3.31",
   ]);
